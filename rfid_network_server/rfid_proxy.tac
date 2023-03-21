@@ -20,6 +20,22 @@ Actually hit it w/ a bunch of clients req.
 5/26/2012 - SDC
 Added some 'connection lost' handling
 Add service capabilities
+
+3/21/2023 Apple j.apple.muncy@gmail.com
+python3 requiers bytes be used with network stuff so do this b'\r'
+Moving settings to settings_local.py
+
+"""
+
+"""
+
+local setting go in an untracked file
+put something like this in settings_local.py
+
+
+SERIAL_PORT = '/dev/ttyUSB0'
+BAUD = 9600
+PORT = 57330
 """
 
 from twisted.application import internet, service
@@ -31,6 +47,10 @@ from twisted.protocols.basic import LineReceiver
 from twisted.python import log
 import sys
 import time
+import os
+sys.path = [os.path.join(os.getcwd(), '.'), ] + sys.path
+
+from settings_local import SERIAL_PORT, BAUD, PORT
 
 class USBClient(LineReceiver): 
 
@@ -93,7 +113,8 @@ class RFIDClientFactory(Factory):
     def notifyAll(self, data):
         for cli in self.client_list:
             log.msg("notify client: %s" % cli)
-            cli.transport.write(data + '\r\n')
+            cli.transport.write(data + b'\n\r')
+	
 
 # when USB lost, notify the suckers and close out
     def USBLost(self, reason):
@@ -106,8 +127,8 @@ class RFIDClientFactory(Factory):
     def notifyUSB(self, data):
         if self.serial_port:
             log.msg("send <%s> to s-port" % data)
-            self.serial_port.write(data + '\r') # \n - nothin \r\n - sort of works. - \r is the key. Go figure!
-    
+            self.serial_port.write(data + b'\r' ) # \n - nothin \r\n - sort of works. - \r is the key. Go figure!
+
     def dropAll(self):
         for cli in self.client_list:
             cli.transport.loseConnection()
@@ -128,15 +149,11 @@ class RFIDClientFactory(Factory):
 """
 Below we set up the twistd DAEMON!
 """
-
-SERIAL_PORT = '/dev/ttyUSB0'
-BAUD = 57600
-
 log.msg("Serial port be: %s" % SERIAL_PORT)
 log.msg("Baud be: %s" % BAUD)
 
 tcpfactory = RFIDClientFactory()
 tcpfactory.establishConnection()
 application = service.Application("rfid_network_server")
-networkService = internet.TCPServer(6666, tcpfactory)
+networkService = internet.TCPServer(PORT, tcpfactory)
 networkService.setServiceParent(application)
