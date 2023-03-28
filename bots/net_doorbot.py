@@ -86,62 +86,78 @@ To look up the tag:
 
 prfo = UserProfile.objects.get(rfid_tag__iexact = 'shit')
 
+03/26/2023  Apple j.apple.muncy@gmail.com
+
+I will be ripping out unsused old code.
+pachube, sensor, and homeheart beat etc.
+with the goal of running lighter and simlar.
 
 """
 
 import re, sys, os
-sys.path.append('/home/pi/Bloominglabs/web_admin')
+sys.path.append('/home/mycode/MySite')
 import logging
 import subprocess, select
 import irclib, random
-import time, urllib, urllib2, simplejson
+import time, urllib, urllib3, simplejson
 import time
 import datetime
 # for future investigation - weirdly from datetime import datetime didn't work!
 # for network piece
 import socket
-from pachube_updater import *
+#  from pachube_updater import *
 import sys
 
-pac = Pachube('/v2/feeds/53278.xml')
+os.environ['DJANGO_SETTINGS_MODULE'] ="settings"
+import django
+django.setup()
 
-from pachube_updater import *
+
+## pac = Pachube('/v2/feeds/53278.xml')
+
+##from pachube_updater import *
 upload_interval = 60 # seconds between uploading sensor/door reading
 last_upload_time = datetime.datetime.now()
-pac = Pachube('/v2/feeds/53278.xml')
-os.environ['DJANGO_SETTINGS_MODULE'] ="settings"
-from django.conf import settings
-from pushingbox import pushingbox
+##pac = Pachube('/v2/feeds/53278.xml')
+##from pushingbox import pushingbox
 
 # put in a proper db or config in future
-sensor_dict = {'1':'Office','0':'Workshop'}
-
+##sensor_dict = {'1':'Office','0':'Workshop'}
+ 
 # port where the RFID server is running. put this in settings.py for the django
 # server
-RFID_PORT = settings.RFID_PORT
-RFID_HOST = settings.RFID_HOST
+RFID_PORT = 6666
+RFID_HOST = 'localhost'
 
 from django.db import models
-from doorman.models import UserProfile, AccessEvent, SensorEvent, PushingboxNotification
+from doorman.models import UserProfile, AccessEvent 
+##, SensorEvent, PushingboxNotification
 from django.contrib.auth.models import User
 
+#Make a place to send loging!
+
+
+logging.basicConfig( filename='/tmp/rfid.log' , encoding='utf-8', level=logging.DEBUG, format = '%(asctime)s - %(name)s - %(levelname)s - %(message)s' )
+
 logger = logging.getLogger('rfid_logger')
-logger.setLevel(logging.WARNING)
-fh = logging.FileHandler('rfid.log')
-fh.setLevel(logging.INFO)
-formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-logger.addHandler(fh)
-ch = logging.StreamHandler()
-ch.setLevel(logging.WARNING)
-fh.setFormatter(formatter)
-ch.setFormatter(formatter)
-logger.addHandler(ch)
+
+#logger.setLevel(logging.WARNING)
+#fh = logging.FileHandler('rfid.log')
+#fh.setLevel(logging.INFO)
+#formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+#logger.addHandler(fh)
+#ch = logging.StreamHandler()
+#ch.setLevel(logging.WARNING)
+#fh.setFormatter(formatter)
+#ch.setFormatter(formatter)
+#logger.addHandler(ch)
+
 logger.info("RFID logger bot started.")
 
 IRC_SERVER =  'irc.bloominglabs.org'
 IRC_PORT = 6667
-IRC_NICK = 'senor_doorbot'
-IRC_NAME = 'Bloominglabs RFID Door System thing'
+IRC_NICK = 'senor_doorbot_2'
+IRC_NAME = 'Bloominglabs RFID Door System thing redux'
 IRC_CHANNEL = "#blabs-bots"
 
 random.seed()
@@ -174,7 +190,7 @@ random_greets = [
 # note. now have to do by tag. watch out for case sensitivity
 authpat =  re.compile("User (\S+) granted access", re.M)
 # add sensor regexp
-sensorpat = re.compile('Zone (\d+) sensor activated', re.M)
+#sensorpat = re.compile('Zone (\d+) sensor activated', re.M)
 
 
 lockedoutpat = re.compile("User (\S+) locked out.", re.M)
@@ -239,7 +255,7 @@ def check_for_sensor(stuff):
         return match.group(1)
     else:
         return None
-
+# this is IRC 
 def check_for_last_command(stuff):
     match = last_command_pat.search(stuff)
     if match:
@@ -269,7 +285,7 @@ def last_command_responses(stuff):
             responses.append('%s at %s' % (q.user.username, q.event_date))
     else:
         responses = ('Command not understood. Types are ''sensor'' or ''access'', you asked for %s' % matches[1],)
-    print responses
+    print (responses)
     return responses
 
 # like before but now both use these
@@ -296,7 +312,8 @@ def handle_msg(client, event, target):
             for r in last_command_responses(stuff):
                 client.privmsg(target,u'%s' % r)
 
-    except Exception, val:
+# Excetion has changed has changer ?
+    except Exception  as val:
         logger.error("fail in pubmsg handle: (%s) (%s)" % (Exception, val))
 
 def handle_privmsg(client, event):
@@ -377,8 +394,8 @@ if __name__ == '__main__':
     officeval = 0
     workshopval = 0
     while True:
-	doorval = 0
-	officeval = 0
+        doorval = 0
+        officeval = 0
  # Wait for input from stdin & socket 1 is timeout
         input_ready, output_ready,except_ready = select.select([rfid_client], [],[],1)
         while input_ready:
@@ -402,30 +419,30 @@ if __name__ == '__main__':
                         stringy = ''
                     sid = check_for_sensor(stringy)
                     if sid != None:
-			if sensor_dict[sid] == 'Office':
-			    officeval = 1
-			if sensor_dict[sid] == 'Workshop':
-			    workshopval = 1
+                        if sensor_dict[sid] == 'Office':
+                            officeval = 1
+                        if sensor_dict[sid] == 'Workshop':
+                            workshopval = 1
                         stringy = ''
                         log_sensor_event(ircConn, sid)
             input_ready, output_ready,except_ready = select.select([rfid_client], [],[],1)
         try:
             ircConn.pong(IRC_CHANNEL)
-        except Exception, val:
+        except Exception as val:
             irc, ircConn = irc_connect()
             logger.error("Failure to pong: %s:%s" % (Exception, val))
         try:
             if (datetime.datetime.now() - last_upload_time).total_seconds() > upload_interval:
                 last_upload_time = datetime.datetime.now()
-                logger.info("let's do some pachube shit")
-                pac.log('Door', doorval)
-                pac.log('Office',officeval)
-                pac.log('Workshop',workshopval)
+#  #              logger.info("let's do some pachube shit")
+#  #              pac.log('Door', doorval)
+#  #              pac.log('Office',officeval)
+#                pac.log('Workshop',workshopval)
                 doorval = 0
                 officeval = 0
                 workshopval = 0
 
-        except Exception, val:
-	    print "cosm probs: %s, %s" % (Exception, val)
+        except Exception as val:
+            print ("cosm probs: %s, %s" % (Exception, val))
             logger.error("IRC/pachube update problems: %s:%s" % (Exception, val))
-	irc.process_once(5) # timeout is 5
+    irc.process_once(5) # timeout is 5
