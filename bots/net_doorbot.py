@@ -92,6 +92,10 @@ I will be ripping out unsused old code.
 pachube, sensor, and homeheart beat etc.
 with the goal of running lighter and simlar.
 
+03/28/2023 Apple
+Now runs with Python 3
+Requireds working Django database.
+Requires updated irclib.py
 """
 
 import re, sys, os
