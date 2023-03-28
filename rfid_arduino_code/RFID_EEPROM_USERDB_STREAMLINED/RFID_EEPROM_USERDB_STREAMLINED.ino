@@ -74,6 +74,12 @@ We are not using it.
 03/19/2023  Apple Muncy j.apple.muncy@gmail.com
 Stripping out many parts to move to single reader and door control.
 
+03/28/2023 Apple
+Reads card.
+Searches EEPROM
+Manually adds new RFID to EEPROM
+
+
 */
 //#include <Wire.h>         // Needed for I2C Connection to the DS1307 date/time chip
 #include <EEPROM.h>       // Needed for saving to non-voilatile memory on the Arduino.
@@ -99,14 +105,16 @@ const long  superUserList[] = {
 ;
 
 #define relayPin 4
-
+                                                                                
+                                                                                
+                                                                                
 // Super user table (cannot be changed by software)
 #define DOORDELAY 5000                  // How long to open door lock once access is granted. (2500 = 2.5s)
 
 #define DOORPIN relayPin       // Define the pin for electrified door 1 hardware
 
 
-#define PRIV_TIMEOUT 60000 // you get a minute, then lockout
+#define PRIV_TIMEOUT 600000 // you get a minute, then lockout
 long privTimer = 0;
 
 
@@ -151,7 +159,7 @@ char* PASSWORD = "ffffffff";
 //Other global variables
 byte second, minute, hour, dayOfWeek, dayOfMonth, month, year;
 // Global RTC clock variables. Can be set using DS1307.getDate function.
-
+// long because we need 32 bits to hold 24 bit long RFID 
 volatile long reader= 0;
 volatile int  readerCount = 0;
 
@@ -257,10 +265,10 @@ const char statusMessage6[]         PROGMEM  = {
 ;
 void setup(){
 	
-	Serial.begin(9600);
+  Serial.begin(9600);
 	
   //Install listeners and initialize Wiegand reader
-  wiegand.onReceive(receivedData, "Card readed: ");
+  wiegand.onReceive(receivedData, "Card reader: ");
   wiegand.onReceiveError(receivedDataError, "Card read error: ");
   wiegand.onStateChange(stateChanged, "State changed: ");
   wiegand.begin(Wiegand::LENGTH_ANY, true);
@@ -273,7 +281,7 @@ void setup(){
 
   //Sends the initial pin state to the Wiegand library
   pinStateChanged();
-	//logReboot();
+  logReboot();
 
 }
 void loop()                                     // Main branch, runs over and over again
@@ -321,7 +329,7 @@ void loop()                                     // Main branch, runs over and ov
 	/* This code checks a reader with a 26-bit keycard input. Use the second routine for readers with keypads.
 	* A 5-second window for commands is opened after each successful key access read.
 	*/
-	if(readerCount >= 26){
+	if(readerCount >= 24){
 		//  When tag presented to reader1 (No keypad on this reader)
 		//logTagPresent(reader1,1);
 		//  write log entry to serial port
@@ -371,7 +379,8 @@ void loop()                                     // Main branch, runs over and ov
 				logAccessDenied(reader,1);
 			}
 		}
-	
+	reader = 0;
+    readerCount = 0;
 		// Reset for next tag scan
 	}
 	
@@ -799,15 +808,23 @@ void stateChanged(bool plugged, const char* message) {
 // Notifies when a card was read.
 // Instead of a message, the seconds parameter can be anything you want -- Whatever you specify on `wiegand.onReceive()`
 void receivedData(uint8_t* data, uint8_t bits, const char* message) {
+    reader = 0;
+    readerCount = bits;    
+    Serial.println("From receivedData");
     Serial.print(message);
     Serial.print(bits);
     Serial.print("bits / ");
     //Print value in HEX
+    
     uint8_t bytes = (bits+7)/8;
     for (int i=0; i<bytes; i++) {
+        reader = reader << 8;
+        reader = reader | data[i];
         Serial.print(data[i] >> 4, 16);
         Serial.print(data[i] & 0xF, 16);
     }
+    Serial.println();
+    Serial.println(reader);
     Serial.println();
 }
 
