@@ -7,16 +7,22 @@ Steve C
 8/13/2015
 
 3/20/2023 Apple Muncy  j.apple.muncy@gmail.com
+4/09/2023
 
 Revising Steves code back to a minimun at the door system.
-Edge computing is all the rage don't you know?
+Edge computing is all the, rage don't you know?
 
-Anyway, the plan, is to have a AG150 box networked by wire or WiFi,
-with a single Arduino UNO connected by USBrunning this code.
-The UNO will connect to the RFID reader.
+Anyway, the plan, is to have a AG150 box networked by wire and/or WiFi,
+with a single Arduino UNO connected by USB running this code.
+
+The UNO will connect to the RFID reader with opto isolation.
+
+And control the latch through a monolithic relay. 
 On reading a valid RFID, it will check the EEPROM DB.
-If found and the mask is not zero or 0xff then pop the door open.
 
-If not found, notify AD150 of the RFID number.
+If found and the mask is not zero or 0xff then pop the door open.
+Then sending event information to the AG150.
+
+If not found, notify AG150 of the RFID number.
     
 

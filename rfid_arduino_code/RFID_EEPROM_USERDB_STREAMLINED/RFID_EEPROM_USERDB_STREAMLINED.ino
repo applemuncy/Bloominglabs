@@ -78,12 +78,13 @@ Stripping out many parts to move to single reader and door control.
 Reads card.
 Searches EEPROM
 Manually adds new RFID to EEPROM
-
+04/10/2023 Apple
+Unwinding some functions to be simpler.
 
 */
 //#include <Wire.h>         // Needed for I2C Connection to the DS1307 date/time chip
 #include <EEPROM.h>       // Needed for saving to non-voilatile memory on the Arduino.
-#include <avr/pgmspace.h> // Allows data to be stored in FLASH instead of RAM
+//#include <avr/pgmspace.h> // Allows data to be stored in FLASH instead of RAM
 
 
 
@@ -96,14 +97,17 @@ Manually adds new RFID to EEPROM
 //#include <PCATTACH.h>     // Pcint.h implementation, allows for >2 software interupts.
 /* Static user List - Implemented as an array for testing and access override
 */
-#define DEBUG 2                         // Set to 2 for display of raw tag numbers in log files, 1 for only denied, 0 for never.
-#define sdc   0xFFFFFF                  // Name and badge number in HEX. We are not using checksums or site ID, just the whole
-#define dosman   0xFFFFFF                  // output string from the reader.
+long sdc  = 0xFFFFFF;                  // Name and badge number in HEX. We are not using checksums or site ID, just the whole
+long dosman =  0xFFFFFF;                  // output string from the reader.
+long apple = 0xFFFFFF;
 const long  superUserList[] = {
-	dosman,sdc
+	dosman,sdc,apple
 }
 ;
 
+bool DEBUG = true;
+#define PIN_D0 2
+#define PIN_D1 3
 #define relayPin 4
                                                                                 
                                                                                 
@@ -124,10 +128,10 @@ void stateChanged(bool plugged, const char* message);
 void pinStateChanged();
 void readCommand();
 void PROGMEMprintln(const char str[]);
-void doorLock(int input);
-void doorUnlock(int input);
+void lockDoor();
+void unlockDoor();
 void logAccessGranted(long user, byte reader);
-int checkSuperuser(long input);
+bool checkSuperuser(long input);
 void logAccessDenied(long user, byte reader);
 
 
@@ -136,22 +140,19 @@ void logAccessDenied(long user, byte reader);
 // These are the pins connected to the Wiegand D0 and D1 signals.
 // Ensure your board supports external Interruptions on these pins
 
-#define PIN_D0 2
-#define PIN_D1 3
 
 
 
 // Relay output pins
-bool doorLocked=true;
+bool doorLocked = true;
 
 unsigned long doorlocktimer=0;
 // Keep track of when door is supposed to be relocked
 
-boolean doorClosed=false;
 unsigned long consolefailTimer=0;
 // Console password timer for failed logins
 byte consoleFail=0;
-#define numUsers (sizeof(superUserList)/sizeof(long))                  //User access array size (used in later loops/etc)
+int numUsers = (sizeof(superUserList)/sizeof(long)) ;                 //User access array size (used in later loops/etc)
 #define NUMDOORS (sizeof(doorPin)/sizeof(byte))
 //#define numAlarmPins (sizeof(analogsensorPins)/sizeof(byte))
 // going this way son
@@ -174,13 +175,12 @@ char inString[40]={
 ;
 // Size of command buffer (<=128 for Arduino)
 byte inCount=0;
+
 boolean privmodeEnabled = false;
 // Switch for enabling "priveleged" commands
+
 /* Create an instance of the various C++ libraries we are using.
 */
-//DS1307 ds1307;
-// RTC Instance
-
 
 Wiegand wiegand;
 
@@ -189,80 +189,8 @@ EEPROM_UserDB UserDB;
 /* Set up some strings that will live in flash instead of memory. This saves our precious 2k of
 * RAM for something else.
 */
-const unsigned char rebootMessage[]          PROGMEM  = {
-	"Access Control System rebooted."
-}
-;
-const unsigned char doorChimeMessage[]       PROGMEM  = {
-	"Front Door opened."
-}
-;
-const unsigned char doorslockedMessage[]     PROGMEM  = {
-	"All Doors relocked"
-}
-;
 
-const unsigned char privsdeniedMessage[]     PROGMEM  = {
-	"Access Denied. Priveleged mode is not enabled."
-}
-;
-const char privsenabledMessage[]    PROGMEM  = {
-	"Priveleged mode enabled."
-}
-;
-const unsigned char privsdisabledMessage[]   PROGMEM  = {
-	"Priveleged mode disabled."
-}
-;
-const unsigned char privsAttemptsMessage[]   PROGMEM  = {
-	"Too many failed attempts. Try again later."
-}
-;
-const unsigned char consolehelpMessage1[]    PROGMEM  = {
-	"Valid commands are:"
-}
-;
-const  unsigned char consolehelpMessage2[]    PROGMEM  = {
-	"(d)ate, (s)show user <tagNumber>, (m)odify user <tagnumber> <usermask>"
-}
-;
-const unsigned char consolehelpMessage3[]    PROGMEM  = {
-	"(a)ll user dump, (r) remove user <tagnumber>, (o)open door <num>"
-}
-;
-const unsigned char consolehelpMessage4[]    PROGMEM  = {
-	"(z)ap all users, (u)nlock all doors,(l)lock all doors"
-}
-;
-const unsigned char consolehelpMessage5[]    PROGMEM  = {
-	"(3)train_sensors (9)show_status"
-}
-;
-const unsigned char consolehelpMessage6[]    PROGMEM  = {
-	"(e)nable <password> - enable or disable priveleged mode"
-}
-;
-const unsigned char consoledefaultMessage[]  PROGMEM  = {
-	"Invalid command. Press '?' for help."
-}
-;
 
-const unsigned char statusMessage3[]         PROGMEM  = {
-	"Front door open state (0=closed):"
-}
-;
-const unsigned char statusMessage4[]         PROGMEM  = {
-	"Roll up door open state (0=closed):"
-}
-;
-const unsigned char statusMessage5[]         PROGMEM  = {
-	"Door 1 unlocked state(1=locked):"
-}
-;
-const char statusMessage6[]         PROGMEM  = {
-	"Door 2 unlocked state(1=locked):"
-}
-;
 void setup(){
 	
   Serial.begin(9600);
@@ -274,8 +202,10 @@ void setup(){
   wiegand.begin(Wiegand::LENGTH_ANY, true);
 
   //initialize pins as INPUT and attaches interruptions
-  pinMode(PIN_D0, INPUT);
-  pinMode(PIN_D1, INPUT);
+  pinMode(PIN_D0, INPUT_PULLUP);
+  pinMode(PIN_D1, INPUT_PULLUP);
+  pinMode(DOORPIN, OUTPUT);
+
   attachInterrupt(digitalPinToInterrupt(PIN_D0), pinStateChanged, CHANGE);
   attachInterrupt(digitalPinToInterrupt(PIN_D1), pinStateChanged, CHANGE);
 
@@ -298,7 +228,7 @@ void loop()                                     // Main branch, runs over and ov
 	// Check for commands entered at serial console
 	if (privmodeEnabled && ((millis() - privTimer) > PRIV_TIMEOUT)) {
 		privmodeEnabled = false;
-		PROGMEMprintln(privsdisabledMessage);
+		Serial.println(F("Priveleged mode disabled."));
 	}
 	/* Check if doors are supposed to be locked and lock/unlock them
 	* if needed. Uses global variables that can be set in other functions.
@@ -306,14 +236,9 @@ void loop()                                     // Main branch, runs over and ov
    
 	if(((millis() - doorlocktimer) >= DOORDELAY) && (doorlocktimer !=0))
 	{
-		if(doorLocked==true){
-			doorLock(1);
-			doorlocktimer=0;
-		}
-		else {
-			doorUnlock(1);
-			doorlocktimer=0;
-		}
+		
+			lockDoor();
+
 	}
 	
 	/*  Set optional "failsafe" time to lock up every night.
@@ -343,8 +268,10 @@ void loop()                                     // Main branch, runs over and ov
 			switch(userMask) {
 				case 0:                                      // No outside privs, do not log denied.
 				{
-					// authenticate only.
-					logAccessGranted(reader, 1);
+					Serial.print(F("User "));
+					Serial.print(userMask,DEC);
+					Serial.println(F(" locked out."));
+
 					break;
 				}
 				case 255:                                              // Locked out user
@@ -358,27 +285,28 @@ void loop()                                     // Main branch, runs over and ov
 				{
 					logAccessGranted(reader, 1);
 					// Log and unlock door 1
-					doorlocktimer=millis();
-					doorUnlock(1);
+		
+					unlockDoor();
 					// Unlock the door.
 					break;
 				}
 			}
 		}
+
 		else
 		{
-			if(checkSuperuser(reader) >= 0) {
+			if(checkSuperuser(reader)) {
 				// Check if a superuser, grant access.
 				logAccessGranted(reader, 1);
 				// Log and unlock door 1
-				doorlocktimer=millis();
-				doorUnlock(1);
+				unlockDoor();
 				// Unlock the door.
 			}
 			else {
 				logAccessDenied(reader,1);
 			}
 		}
+
 	reader = 0;
     readerCount = 0;
 		// Reset for next tag scan
@@ -386,127 +314,79 @@ void loop()                                     // Main branch, runs over and ov
 	
 
 
-	
 
-	
 
 // End of loop()
 
 
 
-//	logDate();
-//	PROGMEMprintln(alarmtrainMessage);
 }
+/*
 
-/* Access System Functions - Modify these as needed for your application.
+ Access System Functions - Modify these as needed for your application.
 These function control lock/unlock and user lookup.
 */
-int checkSuperuser(long input){
+bool checkSuperuser(long input){
 	// Check to see if user is in the user list. If yes, return their index value.
-	int found=-1;
-	for(int i=0; i<=numUsers; i++){
+	bool found= false;
+	for(int i=0; i<numUsers; i++){
 		if(input == superUserList[i]){
-			logDate();
 			Serial.print("Superuser ");
 			Serial.print(i,DEC);
 			Serial.println(" found.");
-			found=i;
+			found= true;
 			return found;
 		}
 	}
 	return found;
-	//If no, return -1
+	//If no, return false
 }
 
-void doorUnlock(int input) {
+void unlockDoor() {
 	//Send an unlock signal to the door and flash the Door LED
 	int dp;
-	if(input == 1) {
-		dp=DOORPIN;
+	dp=DOORPIN;
 	
-	
+	Serial.print("doorpin is  ");
+    Serial.println(dp, DEC);
+  
 	digitalWrite(dp, HIGH);
-	Serial.print(F("Door "));
-	Serial.print(input,DEC);
-	Serial.println(F(" unlocked"));
-	}
+	Serial.println(F("Door unlocked"));
+	doorLocked = false;
+    doorlocktimer=millis();
 }
 
-void doorLock(int input) {
-	//Send an unlock signal to the door and flash the Door LED
-	byte dp=1;
-	if(input == 1) {
-		dp=DOORPIN;
-	
-	
+void lockDoor() {
+	//Send an lock signal to the door and flash the Door LED
+	int dp;
+	dp=DOORPIN;
+
 	digitalWrite(dp, LOW);
-	Serial.print(F("Door "));
-	Serial.print(input,DEC);
-	Serial.println(F(" locked"));
-	}
+	Serial.println(F("Door locked"));
+	doorLocked = true;
+	doorlocktimer=0;
 }
 
-void lockall() {
-	//Lock down all doors. Can also be run periodically to safeguard system.
-	digitalWrite(DOORPIN, LOW);
 
-	doorLocked=true;
-
-	PROGMEMprintln(doorslockedMessage);
-}
-
-/* Logging Functions - Modify these as needed for your application.
-Logging may be serial to USB or via Ethernet (to be added later)
-*/
-void PROGMEMprintln(const char str[])    // Function to retrieve logging strings from program memory
-{
-	// Prints newline after each string
-	char c;
-	if(!str) return;
-	while((c = pgm_read_byte(str++))){
-		Serial.print(c);
-		//,BYTE);
-	}
-	Serial.println();
-}
-
-void PROGMEMprint(const char str[])    // Function to retrieve logging strings from program memory
-{
-	// Does not print newlines
-	char c;
-	if(!str) return;
-	while((c = pgm_read_byte(str++))){
-		Serial.print(c);
-		//,BYTE);
-	}
-}
-
-void logDate()
-{
-	
-	Serial.print("No date time to log ");
-}
 
 void logReboot() {
-	logDate();
-	PROGMEMprintln(rebootMessage);
+	Serial.println(F("Access Control System rebooted."));
 }
 
 void logTagPresent (long user, byte reader) {
-	logDate();
 	Serial.print(F("User "));
-	if(DEBUG==2){
+	if(DEBUG){
 		Serial.print(user,HEX);
 	}
 	Serial.print(F(" presented tag at reader "));
 	Serial.println(reader,DEC);
+
 }
 
 void logAccessGranted(long user, byte reader) {
 	//Log Access events
-	logDate();
 	Serial.print(F("User "));
-	if(DEBUG==2){
+	if(DEBUG){
 		Serial.print(user,HEX);
 	}
 	Serial.print(F(" granted access at reader "));
@@ -515,9 +395,8 @@ void logAccessGranted(long user, byte reader) {
 
 void logAccessDenied(long user, byte reader) {
 	//Log Access denied events
-	logDate();
 	Serial.print(F("User "));
-	if(DEBUG==1){
+	if(DEBUG){
 		Serial.print(user,HEX);
 	}
 	Serial.print(F(" denied access at reader "));
@@ -527,7 +406,6 @@ void logAccessDenied(long user, byte reader) {
 
 
 void logunLock(long user, byte door) {
-	logDate();
 	Serial.print(F("User "));
 	Serial.print(user,DEC);
 	Serial.print(F(" unlocked door "));
@@ -535,7 +413,7 @@ void logunLock(long user, byte door) {
 }
 
 void logprivFail() {
-	PROGMEMprintln(privsdeniedMessage);
+	Serial.println(F("Privilage mode not enabled."));
 }
 
 /* Displays a serial terminal menu system for
@@ -614,14 +492,14 @@ void readCommand() {
 			if(password[0] != 0) {
 				if((consoleFail>=5) && (millis()-consolefailTimer<300000))  // Do not allow priv mode if more than 5 failed logins in 5 minute
 				{
-					PROGMEMprintln(privsAttemptsMessage);
+					Serial.println(F("Too many failed attempts. Try again later."));
 				}
 				else if(strcmp(password,PASSWORD) == 0) {
 					consoleFail=0;
 					requestValidated = true;
 				}
 				else {
-					PROGMEMprintln(privsdisabledMessage);
+					Serial.println(F("Too many failed attempts. Try again later."));
 					privmodeEnabled=false;
 					if(consoleFail==0) {
 						// Set the timeout for failed logins
@@ -631,26 +509,26 @@ void readCommand() {
 					// Increment the login failure counter
 				}
 			}
-			logDate();
+			
 			// note - privmodeEnabled is a per request in this model.
-     Serial.println("Start of cmd case statement");
+  
      switch (cmd) {
 				case 'e': {
 					// Enable "privileged" commands at console
 					if((consoleFail>=5) && (millis()-consolefailTimer<300000))  // Do not allow priv mode if more than 5 failed logins in 5 minute
 					{
-						PROGMEMprintln(privsAttemptsMessage);
+						// Serial.println(privsAttemptsMessage);
 					}
 					// compare the substring
 					if (strcmp(cmdString[1],PASSWORD) == 0)
 					{
 						consoleFail=0;
-						PROGMEMprintln(privsenabledMessage);
+						Serial.println(F("Priveleged mode enabled."));
 						privmodeEnabled=true;
 						privTimer = millis();
 					}
 					else {
-						PROGMEMprintln(privsdisabledMessage);
+						// Serial.println(F("Priveleged mode disabled."));
 						privmodeEnabled=false;
 						if(consoleFail==0) {
 							// Set the timeout for failed logins
@@ -664,7 +542,6 @@ void readCommand() {
 				case 'a': {
 					// List whole user database
 					if(privmodeEnabled==true || requestValidated == true) {
-						logDate();
 						Serial.println("");
 						Serial.print("UserNum:");
 						Serial.print("t");
@@ -688,18 +565,10 @@ void readCommand() {
 					}
 					break;
 				}
-				case 'd': {
-					// Display current time
-					logDate();
-					Serial.println();
-					break;
-				}
-
+			
 				case 'u': {
 					if(privmodeEnabled==true || requestValidated == true) {
-						doorUnlock(1);
-
-						doorLocked=false;
+						unlockDoor();
 					}
 					else{
 						logprivFail();
@@ -708,33 +577,23 @@ void readCommand() {
 				}
 				case 'l': {
 					// Lock all doors
-					lockall();
+					lockDoor();
 					//  chirpAlarm(1);
 					break;
 				}
-				case '3': {
-					// Train alarm sensors
-
-					
-					break;
-				}
+				
 				case '9': {
 					// Show site status
-					PROGMEMprint(statusMessage3);
+					Serial.print(F( "Door is "));
 
-					PROGMEMprint(statusMessage5);
+					Serial.println(doorLocked ? "locked" : "unlocked");
 					break;
 				}
 				case 'o': {
 					if(privmodeEnabled==true || requestValidated == true) {
-						if(atoi(cmdString[1]) == 1){
-							doorUnlock(1);
-							// Open the door specified
-							doorlocktimer=millis();
-							break;
-						}
+						unlockDoor();  // Open the door
+						break;
 						
-						Serial.print(F("Invalid door number!"));
 					}
 					else {
 						logprivFail();
@@ -743,6 +602,8 @@ void readCommand() {
 				}
 				case 'm': {
 					// add or update
+                    Serial.print("cmd string 2 ");
+                    Serial.println( atoi(cmdString[2]), HEX);
 					if(privmodeEnabled==true || requestValidated == true) {
 						UserDB.upsertUser(atoi(cmdString[2]), strtoul(cmdString[1],NULL,16));
 					}
@@ -772,16 +633,16 @@ void readCommand() {
 				}
 				case '?': {
 					// Display help menu
-					PROGMEMprintln(consolehelpMessage1);
-					PROGMEMprintln(consolehelpMessage2);
-					PROGMEMprintln(consolehelpMessage3);
-					PROGMEMprintln(consolehelpMessage4);
-					PROGMEMprintln(consolehelpMessage5);
-					PROGMEMprintln(consolehelpMessage6);
+					 Serial.println(F("Valid commands are:"));
+					 Serial.println(F("(s)show user <tagNumber>, (m)odify user <tagnumber> <usermask>"));
+					 Serial.println(F("(a)ll user dump, (r) remove user <tagnumber>, (o)open door <num>"));
+					 Serial.println(F("(z)ap all users, (u)nlock doors,(l)lock doors"));
+					 Serial.println(F("(9)show_status"));
+					 Serial.println(F("(e)nable <password> - enable or disable priveleged mode"));
 					break;
 				}
 				default:
-				PROGMEMprintln(consoledefaultMessage);
+				 Serial.println(F("Invalid command. Press '?' for help."));
 				break;
 			}
 			// end switch
@@ -794,8 +655,8 @@ void readCommand() {
 
 // When any of the pins have changed, update the state of the wiegand library
 void pinStateChanged() {
-  wiegand.setPin0State(digitalRead(PIN_D0));
-  wiegand.setPin1State(digitalRead(PIN_D1));
+  wiegand.setPin0State(!digitalRead(PIN_D0));
+  wiegand.setPin1State(!digitalRead(PIN_D1));
 }
 
 // Notifies when a reader has been connected or disconnected.
@@ -810,22 +671,22 @@ void stateChanged(bool plugged, const char* message) {
 void receivedData(uint8_t* data, uint8_t bits, const char* message) {
     reader = 0;
     readerCount = bits;    
-    Serial.println("From receivedData");
-    Serial.print(message);
-    Serial.print(bits);
-    Serial.print("bits / ");
+//    Serial.println("From receivedData");
+//    Serial.print(message);
+//    Serial.print(bits);
+//    Serial.print("bits / ");
     //Print value in HEX
     
     uint8_t bytes = (bits+7)/8;
     for (int i=0; i<bytes; i++) {
         reader = reader << 8;
         reader = reader | data[i];
-        Serial.print(data[i] >> 4, 16);
-        Serial.print(data[i] & 0xF, 16);
+//        Serial.print(data[i] >> 4, 16);
+  //      Serial.print(data[i] & 0xF, 16);
     }
-    Serial.println();
-    Serial.println(reader);
-    Serial.println();
+//    Serial.println();
+//    Serial.println(reader);
+//    Serial.println();
 }
 
 // Notifies when an invalid transmission is detected
