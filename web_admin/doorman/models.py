@@ -59,7 +59,7 @@ class UserProfile(models.Model):
     #syncing = models.IntegerField(default = 0)
 
     def save(self, *args, **kwargs):
-        print "in da save, son"
+        print ("in da save, son")
         try:
             mask = 255 # actually this is the 'locked out' - 0 is the 'just log it'
             existing = UserProfile.objects.all().get(user=self.user)
@@ -67,7 +67,7 @@ class UserProfile(models.Model):
             self.id = existing.id #force update instead of insert
             if (self.rfid_access):
                 mask = 1
-            print "going for the EEPROM mod"
+            print ("going for the EEPROM mod")
             if rfid_sock.modify_user(local_settings.RFID_HOST, local_settings.RFID_PORT, self.rfid_tag, mask, local_settings.RFID_PASSWORD):
                 self.sync_date = datetime.now()
             # also set synch date, synching
@@ -82,13 +82,13 @@ def create_user_profile(sender, instance, created, **kwargs):
 
 # tie to User deletion
 def profile_in_delete_queue(sender, instance, **kwargs):
-    print "user about to be deleted, see if we need to put in queue"
+    print ("user about to be deleted, see if we need to put in queue")
     try:
         existing = UserProfile.objects.all().get(user=instance)
         if existing.rfid_tag:
             add_tag_to_delete_queue(existing.rfid_tag)
     except UserProfile.DoesNotExist:
-        print "fuck, couldn't find profile for %s" % instance
+        print ("fuck, couldn't find profile for %s" % instance)
 
 post_save.connect(create_user_profile, sender=User)
 pre_delete.connect(profile_in_delete_queue, sender=User)

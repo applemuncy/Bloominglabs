@@ -4,7 +4,7 @@
 *
 * 4/3/2011 v1.32
 * Last build test with Arduino v00.21
-* Arclight - arclight@23.org
+* Arclight - arclight@23.orgminicom -/dev
 * Danozano - danozano@gmail.com
 *
 * Notice: This is free software and is probably buggy. Use it at
@@ -118,7 +118,8 @@ bool DEBUG = true;
 #define DOORPIN relayPin       // Define the pin for electrified door 1 hardware
 
 
-#define PRIV_TIMEOUT 600000 // you get a minute, then lockout
+#define PRIV_TIMEOUT 600000 // you get ten minutes, then lockout
+                            //
 long privTimer = 0;
 
 
@@ -133,6 +134,7 @@ void unlockDoor();
 void logAccessGranted(long user, byte reader);
 bool checkSuperuser(long input);
 void logAccessDenied(long user, byte reader);
+void logReboot();
 
 
 
@@ -156,7 +158,7 @@ int numUsers = (sizeof(superUserList)/sizeof(long)) ;                 //User acc
 #define NUMDOORS (sizeof(doorPin)/sizeof(byte))
 //#define numAlarmPins (sizeof(analogsensorPins)/sizeof(byte))
 // going this way son
-char* PASSWORD = "ffffffff";
+char* PASSWORD = "pass";
 //Other global variables
 byte second, minute, hour, dayOfWeek, dayOfMonth, month, year;
 // Global RTC clock variables. Can be set using DS1307.getDate function.
@@ -205,7 +207,7 @@ void setup(){
   pinMode(PIN_D0, INPUT_PULLUP);
   pinMode(PIN_D1, INPUT_PULLUP);
   pinMode(DOORPIN, OUTPUT);
-
+  lockDoor();
   attachInterrupt(digitalPinToInterrupt(PIN_D0), pinStateChanged, CHANGE);
   attachInterrupt(digitalPinToInterrupt(PIN_D1), pinStateChanged, CHANGE);
 
@@ -263,7 +265,11 @@ void loop()                                     // Main branch, runs over and ov
 		*  locked out users or uninitialized records.
 		*  Modify these for each door as needed.
 		*/
-		userMask = UserDB.checkUser(reader);
+    //if(readerCount == 25){
+    //  reader = reader >> 1;
+    //  reader = reader & 0xFFFFFF ;
+    //}
+ 		userMask = UserDB.checkUser(reader);
 		if(userMask>=0) {
 			switch(userMask) {
 				case 0:                                      // No outside privs, do not log denied.
@@ -350,7 +356,7 @@ void unlockDoor() {
 	Serial.print("doorpin is  ");
     Serial.println(dp, DEC);
   
-	digitalWrite(dp, HIGH);
+	digitalWrite(dp, LOW);
 	Serial.println(F("Door unlocked"));
 	doorLocked = false;
     doorlocktimer=millis();
@@ -361,7 +367,7 @@ void lockDoor() {
 	int dp;
 	dp=DOORPIN;
 
-	digitalWrite(dp, LOW);
+	digitalWrite(dp, HIGH);
 	Serial.println(F("Door locked"));
 	doorLocked = true;
 	doorlocktimer=0;
@@ -634,9 +640,14 @@ void readCommand() {
 				case '?': {
 					// Display help menu
 					 Serial.println(F("Valid commands are:"));
-					 Serial.println(F("(s)show user <tagNumber>, (m)odify user <tagnumber> <usermask>"));
-					 Serial.println(F("(a)ll user dump, (r) remove user <tagnumber>, (o)open door <num>"));
-					 Serial.println(F("(z)ap all users, (u)nlock doors,(l)lock doors"));
+					 Serial.println(F("(s)show user <tagNumber>"));
+					 Serial.println(F("(m)odify user <tagnumber> <usermask>"));
+					 Serial.println(F("(a)ll user dump"));
+					 Serial.println(F("(r) remove user <tagnumber>"));
+					 Serial.println(F("(o)open door <num>"));
+					 Serial.println(F("(z)ap all users")); 
+					 Serial.println(F("(u)nlock doors"));
+					 Serial.println(F("(l)lock doors"));
 					 Serial.println(F("(9)show_status"));
 					 Serial.println(F("(e)nable <password> - enable or disable priveleged mode"));
 					break;

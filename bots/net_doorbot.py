@@ -194,7 +194,7 @@ random_greets = [
 # note. now have to do by tag. watch out for case sensitivity
 authpat =  re.compile("User (\S+) granted access", re.M)
 # add sensor regexp
-#sensorpat = re.compile('Zone (\d+) sensor activated', re.M)
+sensorpat = re.compile('Zone (\d+) sensor activated', re.M)
 
 
 lockedoutpat = re.compile("User (\S+) locked out.", re.M)
@@ -407,7 +407,8 @@ if __name__ == '__main__':
             for i in input_ready:
                 if i == rfid_client:
                     charry = rfid_client.recv(1)
-                    stringy = stringy + charry
+                    stringy = stringy + str(charry)
+                    
 
                     uid = check_for_denied(stringy)
                     if uid:
@@ -438,8 +439,8 @@ if __name__ == '__main__':
         try:
             if (datetime.datetime.now() - last_upload_time).total_seconds() > upload_interval:
                 last_upload_time = datetime.datetime.now()
-#  #              logger.info("let's do some pachube shit")
-#  #              pac.log('Door', doorval)
+                logger.info("let's do some pachube shit")
+                pac.log('Door', doorval)
 #  #              pac.log('Office',officeval)
 #                pac.log('Workshop',workshopval)
                 doorval = 0
