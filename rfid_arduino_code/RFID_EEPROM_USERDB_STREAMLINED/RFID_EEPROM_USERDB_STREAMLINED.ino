@@ -550,9 +550,9 @@ void readCommand() {
 					if(privmodeEnabled==true || requestValidated == true) {
 						Serial.println("");
 						Serial.print("UserNum:");
-						Serial.print("t");
+						Serial.print("\t");
 						Serial.print("Usermask:");
-						Serial.print("t");
+						Serial.print("\t");
 						Serial.println("TagNum:");
 						UserDB.dumpUsers();
 					}
