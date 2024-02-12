@@ -32,7 +32,7 @@ From this guy
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin
 from django.contrib.auth.models import User
-from models import UserProfile, AccessEvent, SensorEvent, PushingboxNotification, Timespan, Calendar
+from .models import UserProfile, AccessEvent, SensorEvent, PushingboxNotification, Timespan, Calendar
 from django.contrib.admin import SimpleListFilter
 
 

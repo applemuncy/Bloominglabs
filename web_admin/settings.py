@@ -4,8 +4,20 @@ to do, work out DJANGO_SETTINGS env var, what if multiple projects son?
 
 """
 
+from pathlib import Path
 from local_settings import *
 DEBUG=True
+
+ALLOWED_HOSTS = ['10.1.10.119',
+                 'localhost',
+                 'dms.local' ]
+CSRF_TRUSTED_ORIGINS = [
+        "127.0.0.1"
+        '10.1.10.119',
+        'localhost',
+        'dms.local' 
+        ]
+
 TEMPLATE_DEBUG = DEBUG
 
 ADMINS = (
@@ -13,7 +25,7 @@ ADMINS = (
 )
 import os
 MANAGERS = ADMINS
-AUTH_PROFILE_MODULE = 'DoorMan.UserProfile'
+AUTH_PROFILE_MODULE = 'doorman.UserProfile'
 
 DATABASES = {
     'default': {
@@ -33,7 +45,7 @@ DATABASES = {
 # timezone as the operating system.
 # If running in a Windows environment this must be set to the same as your
 # system time zone.
-TIME_ZONE = None # 'America/Chicago'
+TIME_ZONE = 'America/Chicago'
 
 # Language code for this installation. All choices can be found here:
 # http://www.i18nguy.com/unicode/language-identifiers.html
@@ -84,6 +96,7 @@ STATICFILES_DIRS = (
 
 # List of finder classes that know how to find static files in
 # various locations.
+
 STATICFILES_FINDERS = (
     'django.contrib.staticfiles.finders.FileSystemFinder',
     'django.contrib.staticfiles.finders.AppDirectoriesFinder',
@@ -94,19 +107,23 @@ STATICFILES_FINDERS = (
 SECRET_KEY = 'byxynfcwf1kvym@(*rj*k*1ji8)5n&ge-_3cqt58o*=y$#-ne1'
 
 # List of callables that know how to import templates from various sources.
+"""
 TEMPLATE_LOADERS = (
     'django.template.loaders.filesystem.Loader',
     'django.template.loaders.app_directories.Loader',
 #     'django.template.loaders.eggs.Loader',
 )
+"""
 
-MIDDLEWARE_CLASSES = (
-    'django.middleware.common.CommonMiddleware',
+MIDDLEWARE = [
+    'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
+    'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
-)
+    'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    ]
 
 ROOT_URLCONF = 'urls'
 
@@ -115,20 +132,38 @@ TEMPLATE_DIRS = (
     # Always use forward slashes, even on Windows.
     # Don't forget to use absolute paths, not relative paths.
     os.path.join(PROJECT_ROOT,'templates'),
+    os.path.join(PROJECT_ROOT,'doorman/templates'),
 )
 
 INSTALLED_APPS = (
+        
+    'doorman',
     'django.contrib.auth',
     'django.contrib.contenttypes',
     'django.contrib.sessions',
  # prob moving code back and forth
-#   'django.contrib.sites',
+    'django.contrib.sites',
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'django.contrib.admin',
-    'doorman',
-    'thermo',
 )
+
+TEMPLATES = [
+    {
+        'BACKEND': 'django.template.backends.django.DjangoTemplates',
+        'DIRS': [],
+        'APP_DIRS': True,
+        'OPTIONS': {
+            'context_processors': [
+                'django.template.context_processors.debug',
+                'django.template.context_processors.request',
+                'django.contrib.auth.context_processors.auth',
+                'django.contrib.messages.context_processors.messages',
+            ],
+        },
+    },
+]
+
 
 # A sample logging configuration. The only tangible logging
 # performed by this configuration is to send an email to

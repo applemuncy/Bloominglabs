@@ -22,22 +22,22 @@ foundpat = re.compile("Tag: (\S+) found and updated to mask:(\S+)", re.M)
 
 def open_fucking_door(password, host = HOST, port = PORT):
     try:
-      print "make socket"
+      print ("make socket")
       sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    except socket.error, msg:
+    except (socket.error, msg):
       sys.stderr.write("[CREATE SOCKET ERROR] %s\n" % msg[1])
       return False
     try:
-      print "connect"
+      print ("connect")
       sock.connect((host,int(port)))
-    except socket.error, msg:
+    except (socket.error, msg):
       sys.stderr.write("[CONNECT ERROR] %s\n" % msg[1])
       return False
 # add Exception below
     try:
-        print "send"
+        print ("send")
         sock.send("o 1$%s\r\n" % (password))
-    except socket.error, msg:
+    except (socket.error, msg):
         sys.stderr.write("[SEND ERROR] %s\n" % msg[1])
         return False
     # at this point essentially fuck it.
@@ -45,50 +45,50 @@ def open_fucking_door(password, host = HOST, port = PORT):
 
 def modify_user(host, port, tag, mask, password):
     try:
-      print "make socket"
+      print ("make socket")
       sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    except socket.error, msg:
+    except (socket.error, msg):
       sys.stderr.write("[CREATE SOCKET ERROR] %s\n" % msg[1])
       return False
     try:
-      print "connect"
+      print ("connect")
       sock.connect((host,port))
-    except socket.error, msg:
+    except (socket.error, msg):
       sys.stderr.write("[CONNECT ERROR] %s\n" % msg[1])
       return False
 # add Exception below
     try:
-        print "send"
+        print ("send")
         sock.send("m %s %s$%s\r\n" % (tag, mask, password))
-    except socket.error, msg:
+    except (socket.error, msg):
         sys.stderr.write("[SEND ERROR] %s\n" % msg[1])
         return False
     string = ""
     success = False
-    print "read"
+    print ("read")
     while 1:
         rlist, wlist, elist = select.select( [sock,], [], [], 5 )
     
         # Test for timeout
         if [rlist, wlist, elist] == [ [], [], [] ]:
-            print "Five seconds elapsed.\n"
+            print ("Five seconds elapsed.\n")
             break
         else:
             data = sock.recv(1024)
             string = string + data
             match = foundpat.search(string)
             if match:
-                print "tag: %s mask %s\n" % (match.group(1), match.group(2))
+                print ("tag: %s mask %s\n" % (match.group(1), match.group(2)))
                 success = True
                 break;
             match = newpat.search(string)
             if match:
-                print "tag: %s mask %s\n" % (match.group(1), match.group(2))
+                print ("tag: %s mask %s\n" % (match.group(1), match.group(2)))
                 success = True
                 break
 
-    print string
-    print success
+    print (string)
+    print (success)
     return success
 
 # wow, that's easy
@@ -96,12 +96,12 @@ def modify_user(host, port, tag, mask, password):
 def send_command(command):
     try:
       sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    except socket.error, msg:
+    except (socket.error, msg):
       sys.stderr.write("[ERROR] %s\n" % msg[1])
       return None
     try:
       sock.connect((HOST, PORT))
-    except socket.error, msg:
+    except (socket.error, msg):
       sys.stderr.write("[ERROR] %s\n" % msg[1])
       return None
     
@@ -114,14 +114,14 @@ def send_command(command):
     
         # Test for timeout
         if [rlist, wlist, elist] == [ [], [], [] ]:
-            print "Five seconds elapsed.\n"
+            print ("Five seconds elapsed.\n")
             break
         else:
             data = sock.recv(1024)
             string = string + data
-            print "select read:%s" % data
+            print ("select read:%s" % data)
     sock.close()     
-    print string
+    print (string)
     return string
 
 if __name__ == '__main__':

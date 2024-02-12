@@ -117,15 +117,15 @@ RFID_PORT = settings.RFID_PORT
 RFID_HOST = settings.RFID_HOST
 
 from django.db import models
-#from DoorMan.doorman.models import UserProfile, AccessEvent 
-#from django.contrib.auth.models import User
+from DoorMan.models import UserProfile, AccessEvent 
+from django.contrib.auth.models import User
 """
-logger = logging.getLogger('rfid_logger')
-logger.setLevel(logging.INFO)
+logging = logging.getLogger('rfid_logging')
+logging.setLevel(logging.INFO)
 fh = logging.FileHandler('rfid.log')
 fh.setLevel(logging.INFO)
 formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-logger.addHandler(fh)
+logging.addHandler(fh)
 ch = logging.StreamHandler()
 ch.setLevel(logging.WARNING)
 fh.setFormatter(formatter)
@@ -144,9 +144,9 @@ IRC_CHANNEL = settings.IRC_CHANNEL
 nickname = settings.IRC_NICKNAME    
 IRC_SERVER = settings.IRC_SERVER
 
-#logger.addHandler(ch)
+#logging.addHandler(ch)
 
-logging.info("RFID logger bot started.")
+logging.info("RFID logging bot started.")
 
 random.seed()
 max_sleep = 3 # 'take a breath' after responding. prevent bots from making
@@ -268,9 +268,7 @@ def last_command_responses(stuff):
 # like before but now both use these
 
 def handle_msg(connection, event ):
-    logging.info("handle_msg\r")
-    
-    logging.info("channel")
+    logging.info("handle_msg")
 
     logging.info("event.type")
     logging.info(event.type)
@@ -281,11 +279,10 @@ def handle_msg(connection, event ):
     logging.info("event.target")
     logging.info(event.target)
 
-
     logging.info("event.arguments[0]")
     logging.info(event.arguments[0])
 
-    print(event.arguments[0])
+    IRC_message = event.arguments[0]
 
 """    
     stuff = ','.join(event.arguments())
@@ -300,7 +297,7 @@ def handle_msg(connection, event ):
             if stuff.find('get lost')>=0:
                  :w
                  client.disconnect('AAGUUGGGHHHHHHuuaaaaa!')
-                logger.info("Fuck it, I disconnected")
+                logging.info("Fuck it, I disconnected")
             else:
 #                client.privmsg(target,u'%s, %s' % ('Type ''last n access'' or ''last n sensor'' to see recent accesses or sensors',name))
                 msg = random_greets[random.choice(range(len(random_greets)))] % name
@@ -311,7 +308,7 @@ def handle_msg(connection, event ):
                 client.privmsg(target,u'%s' % r)
 
     except Exception as val:
-        logger.error("fail in pubmsg handle: (%s) (%s)" % (Exception, val))
+        logging.error("fail in pubmsg handle: (%s) (%s)" % (Exception, val))
 """
 def handle_privmsg(connection, event):
     handle_msg(connection ,event, (event.source().split('!'))[0])
@@ -333,14 +330,14 @@ def log_door_event(connection, user_id):
     try:
         prof = UserProfile.objects.get(rfid_tag__iexact = user_id)
     except:
-        logger.error("Strange: no username found in DB for user %s." % user_id)
+        logging.error("Strange: no username found in DB for user %s." % user_id)
     username = 'UNKNOWN'
     if prof:
         # note can't log unknow this way, though
         event = AccessEvent(user = prof.user)
         event.save()
         username = prof.user.username
-    logger.info("we see: %s aka %s" % (user_id, username))
+    logging.info("we see: %s aka %s" % (user_id, username))
     msg = "!s " + random_sez[random.choice(range(len(random_sez)))] % username
     connection.privmsg(IRC_CHANNEL,msg)
 
@@ -348,7 +345,7 @@ def log_door_event(connection, user_id):
 
 
 if __name__ == '__main__':
-    logging.info("Started main:  logger.")
+    logging.info("Started main:  logging.")
     logging.info("Started IRC .")
 
 #    MDSbot = IrcBot(channel, nickname, server, port)
@@ -358,7 +355,7 @@ if __name__ == '__main__':
     server.connect(IRC_SERVER, port, nickname)
     server.join( channel, key="")
 
-    server.privmsg(channel, "Hello")
+    server.privmsg(channel, "I'm glad to be here.")
     #client.add_global_handler("pubmsg" , handle_pubmsg(client , "pubmsg")) 
     client.add_global_handler("pubmsg" , handle_pubmsg)
 
@@ -374,7 +371,7 @@ if __name__ == '__main__':
             logging.info("Connected RFID socket.")
 
         except:
-            logger.info("retrying connect to rfid in 10....")
+            logging.info("retrying connect to rfid in 10....")
             time.sleep(10)
             logging.info("Not Connected")
     stringy = ''
@@ -392,7 +389,8 @@ if __name__ == '__main__':
                 if i == rfid_client:
                     charry = rfid_client.recv(1).decode("utf-8")
                     stringy = stringy + charry
-
+                    logging.info("stringy = ")
+                    logging.info(stringy)
                     uid = check_for_denied(stringy)
                     if uid:
                         create_dummy(uid)
@@ -402,10 +400,15 @@ if __name__ == '__main__':
                     uid = check_for_door(stringy)
                     if uid:
                         doorval = 1
-                        log_door_event(ircConn, uid)
+                        log_door_event(server, uid)
                         time.sleep(3)
                         stringy = ''
             input_ready, output_ready,except_ready = select.select([rfid_client], [],[],1)
+            logging.info( "input_ready = %s" % input_ready)
+            logging.info( "output_ready = %s" %  output_ready)
+            logging.info( "except_ready = %s" %  except_ready)
+
+
         try:
             if (datetime.datetime.now() - last_upload_time).total_seconds() > upload_interval:
                 last_upload_time = datetime.datetime.now()

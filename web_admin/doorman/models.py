@@ -47,7 +47,9 @@ def add_tag_to_delete_queue(tag):
 
 class UserProfile(models.Model):
     # This field is required.
-    user = models.OneToOneField(User)
+    user = models.OneToOneField(User,
+                                on_delete=models.CASCADE,
+                                )
     # Other fields here
     rfid_access = models.BooleanField(default=False)
     rfid_tag = models.CharField(max_length=20,blank=True,null=True,unique=True)
@@ -55,7 +57,7 @@ class UserProfile(models.Model):
 
     rfid_label = models.CharField(max_length = 50) # little label on the tag
     update_date = models.DateTimeField(null=True, blank = False, auto_now = True) # taking matters into my own hands...
-    sync_date = models.DateTimeField(null=True, blank=True, auto_now = True, auto_now_add = True)
+    sync_date = models.DateTimeField(null=True, blank=True, auto_now = True, )
     #syncing = models.IntegerField(default = 0)
 
     def save(self, *args, **kwargs):
@@ -100,7 +102,9 @@ for storing when we let ppl in
 """
 
 class AccessEvent(models.Model):
-    user = models.ForeignKey(User)
+    user = models.ForeignKey(User,
+                             on_delete=models.CASCADE,
+                             )
     event_date = models.DateTimeField(auto_now = True)
 
 """
@@ -122,7 +126,9 @@ for notifications
 """
 
 class PushingboxNotification(models.Model):
-    notification_user = models.ForeignKey(User)
+    notification_user = models.ForeignKey(User,
+                                          on_delete=models.CASCADE,
+                                          )
     notification_devid = models.CharField(max_length = 30)
     notification_type = models.CharField(max_length = 20, choices=NOTIFICATION_TYPE_CHOICES)
 

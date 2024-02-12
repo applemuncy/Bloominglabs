@@ -1,5 +1,5 @@
 import rfid_sock
-from django.shortcuts import render_to_response
+from django.shortcuts import render
 from django.contrib.auth.decorators import login_required
 import local_settings
 
@@ -8,5 +8,9 @@ def open_door(request):
     success =  rfid_sock.open_fucking_door(local_settings.RFID_PASSWORD,
         local_settings.RFID_HOST, 
     	local_settings.RFID_PORT) 
-    return render_to_response('door_open.html',
+    return render('door_open.html',
                               { "success":success })
+
+def index(request):
+    return render(request, 'doorman/index.html')
+
