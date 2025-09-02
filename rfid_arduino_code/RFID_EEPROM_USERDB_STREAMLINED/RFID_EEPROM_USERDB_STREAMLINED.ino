@@ -80,7 +80,9 @@ Searches EEPROM
 Manually adds new RFID to EEPROM
 04/10/2023 Apple
 Unwinding some functions to be simpler.
-
+09/02/2025 Apple
+Get all your programming done before senility sets in.
+Add const to PASSWORD line to shut the compiler up.
 */
 //#include <Wire.h>         // Needed for I2C Connection to the DS1307 date/time chip
 #include <EEPROM.h>       // Needed for saving to non-voilatile memory on the Arduino.
@@ -158,7 +160,7 @@ int numUsers = (sizeof(superUserList)/sizeof(long)) ;                 //User acc
 #define NUMDOORS (sizeof(doorPin)/sizeof(byte))
 //#define numAlarmPins (sizeof(analogsensorPins)/sizeof(byte))
 // going this way son
-char* PASSWORD = "pass";
+const char* PASSWORD = "pass";
 //Other global variables
 byte second, minute, hour, dayOfWeek, dayOfMonth, month, year;
 // Global RTC clock variables. Can be set using DS1307.getDate function.
