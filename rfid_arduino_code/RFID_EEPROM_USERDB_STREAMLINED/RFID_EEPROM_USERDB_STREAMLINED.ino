@@ -641,7 +641,8 @@ void readCommand() {
 				}
 				case '?': {
 					// Display help menu
-					 Serial.println(F("Valid commands are:"));
+           Serial.println(F("Version 1.34   09/03/2025"));
+           Serial.println(F("Valid commands are:"));
 					 Serial.println(F("(s)show user <tagNumber>"));
 					 Serial.println(F("(m)odify user <tagnumber> <usermask>"));
 					 Serial.println(F("(a)ll user dump"));
