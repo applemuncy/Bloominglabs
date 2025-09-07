@@ -7,6 +7,8 @@
 * Arclight - arclight@23.orgminicom -/dev
 * Danozano - danozano@gmail.com
 *
+*
+*
 * Notice: This is free software and is probably buggy. Use it at
 * at your own peril.  Use of this software may result in your
 * doors being left open, your stuff going missing, or buggery by
@@ -83,6 +85,7 @@ Unwinding some functions to be simpler.
 09/02/2025 Apple
 Get all your programming done before senility sets in.
 Add const to PASSWORD line to shut the compiler up.
+09/07/2025 version 1.35 Apple
 */
 //#include <Wire.h>         // Needed for I2C Connection to the DS1307 date/time chip
 #include <EEPROM.h>       // Needed for saving to non-voilatile memory on the Arduino.
@@ -357,8 +360,8 @@ void unlockDoor() {
 	
 	Serial.print("doorpin is  ");
     Serial.println(dp, DEC);
-  
-	digitalWrite(dp, LOW);
+// I must have wired the relay backwords, Check in the future  
+	digitalWrite(dp, HIGH);
 	Serial.println(F("Door unlocked"));
 	doorLocked = false;
     doorlocktimer=millis();
@@ -368,8 +371,9 @@ void lockDoor() {
 	//Send an lock signal to the door and flash the Door LED
 	int dp;
 	dp=DOORPIN;
+// as above relay is upside down or something
 
-	digitalWrite(dp, HIGH);
+	digitalWrite(dp, LOW);
 	Serial.println(F("Door locked"));
 	doorLocked = true;
 	doorlocktimer=0;
@@ -641,7 +645,7 @@ void readCommand() {
 				}
 				case '?': {
 					// Display help menu
-           Serial.println(F("Version 1.34   09/03/2025"));
+           Serial.println(F("Version 1.35   09/07/2025"));
            Serial.println(F("Valid commands are:"));
 					 Serial.println(F("(s)show user <tagNumber>"));
 					 Serial.println(F("(m)odify user <tagnumber> <usermask>"));
