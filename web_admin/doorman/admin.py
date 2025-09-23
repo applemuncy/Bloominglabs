@@ -9,15 +9,14 @@ from models import UserProfile
 admin.site.unregister(User)
 
 class UserProfileInline(admin.StackedInline):
-	model = UserProfile
+
+    model = UserProfile
 
 class UserProfileAdmin(UserAdmin):
 	inlines = [UserProfileInline]
 
 admin.site.register(User, UserProfileAdmin)
-"""
 
-"""
 
 note-
 
@@ -32,7 +31,7 @@ From this guy
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin
 from django.contrib.auth.models import User
-from .models import UserProfile, AccessEvent, SensorEvent, PushingboxNotification, Timespan, Calendar
+from .models import UserProfile, AccessEvent
 from django.contrib.admin import SimpleListFilter
 
 
@@ -66,22 +65,42 @@ class UserProfileInline(admin.TabularInline):
 
 class CustomUserAdmin(UserAdmin):
     inlines = [UserProfileInline,]
-    list_display = ('username', 'email', 'first_name', 'last_name',
-                    'user_rfid_access',  'user_rfid_tag', 'user_rfid_label',
-                    'user_sync_date', 'is_active')
+    list_display = ('username',
+                    'email',
+                    'first_name', 
+                    'last_name',
+                    'user_rfid_access',
+                    'user_rfid_tag',
+                    'user_rfid_label',
+                    'user_sync_date', 
+                    'is_active')
     list_filter = (RFIDFilter,)
 
     def user_rfid_tag(self, instance):
-        return instance.get_profile().rfid_tag
+        user = instance.profile
+
+
+        return user.rfid_tag
 
     def user_rfid_label(self, instance):
-        return instance.get_profile().rfid_label
+        user = instance.profile
+
+
+        return user.rfid_label
 
     def user_rfid_access(self, instance):
-        return instance.get_profile().rfid_access
+        user = instance.profile
+
+
+        return user.rfid_access
 
     def user_sync_date(self, instance):
-        return instance.get_profile().sync_date
+        user = instance.profile
+
+       
+        return user.sync_date
+
+
 
 admin.site.unregister(User)
 admin.site.register(User, CustomUserAdmin)
@@ -91,24 +110,5 @@ class AccessEventAdmin(admin.ModelAdmin):
 
 admin.site.register(AccessEvent, AccessEventAdmin)
 
-class SensorEventAdmin(admin.ModelAdmin):
-    list_display = ('event_type', 'event_source', 'event_date', 'event_value')
-
-admin.site.register(SensorEvent, SensorEventAdmin)
-
-class PushingboxNotificationAdmin(admin.ModelAdmin):
-    list_display = ('notification_user', 'notification_type', 'notification_devid',)
-
-admin.site.register(PushingboxNotification, PushingboxNotificationAdmin)
 
 
-class TimespanAdmin(admin.ModelAdmin):
-    pass
-
-admin.site.register(Timespan, TimespanAdmin)
-
-class CalendarAdmin(admin.ModelAdmin):
-    filter_horizontal = ('timespans', 'groups',)
-
-
-admin.site.register(Calendar, CalendarAdmin)

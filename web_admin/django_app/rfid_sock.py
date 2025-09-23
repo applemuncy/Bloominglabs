@@ -24,21 +24,21 @@ def open_fucking_door(password, host = HOST, port = PORT):
     try:
       print ("make socket")
       sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    except (socket.error, msg):
-      sys.stderr.write("[CREATE SOCKET ERROR] %s\n" % msg[1])
+    except socket.error as e:
+      sys.stderr.write(f"[CREATE SOCKET ERROR]  {e}")
       return False
     try:
       print ("connect")
       sock.connect((host,int(port)))
-    except (socket.error, msg):
-      sys.stderr.write("[CONNECT ERROR] %s\n" % msg[1])
+    except socket.error as  msg:
+      sys.stderr.write(f"[CONNECT ERROR]  { msg}")
       return False
 # add Exception below
     try:
         print ("send")
         sock.send("o 1$%s\r\n" % (password))
-    except (socket.error, msg):
-        sys.stderr.write("[SEND ERROR] %s\n" % msg[1])
+    except socket.error as msg:
+        sys.stderr.write(f"[SEND ERROR] { msg}")
         return False
     # at this point essentially fuck it.
     return True
@@ -47,21 +47,21 @@ def modify_user(host, port, tag, mask, password):
     try:
       print ("make socket")
       sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    except (socket.error, msg):
-      sys.stderr.write("[CREATE SOCKET ERROR] %s\n" % msg[1])
+    except socket.error as msg:
+      sys.stderr.write(f"[CREATE SOCKET ERROR] {msg}")
       return False
     try:
       print ("connect")
       sock.connect((host,port))
-    except (socket.error, msg):
-      sys.stderr.write("[CONNECT ERROR] %s\n" % msg[1])
+    except socket.error as msg:
+      sys.stderr.write(f"[CONNECT ERROR] {msg}")
       return False
 # add Exception below
     try:
         print ("send")
         sock.send("m %s %s$%s\r\n" % (tag, mask, password))
-    except (socket.error, msg):
-        sys.stderr.write("[SEND ERROR] %s\n" % msg[1])
+    except socket.error as msg:
+        sys.stderr.write(f"[SEND ERROR] {msg}")
         return False
     string = ""
     success = False
@@ -96,13 +96,13 @@ def modify_user(host, port, tag, mask, password):
 def send_command(command):
     try:
       sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    except (socket.error, msg):
-      sys.stderr.write("[ERROR] %s\n" % msg[1])
+    except socket.error as msg:
+      sys.stderr.write(f"[ERROR] { msg}")
       return None
     try:
       sock.connect((HOST, PORT))
-    except (socket.error, msg):
-      sys.stderr.write("[ERROR] %s\n" % msg[1])
+    except socket.error as msg:
+      sys.stderr.write("f[ERROR] {msg}")
       return None
     
     sock.send(command )

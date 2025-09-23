@@ -3,21 +3,13 @@
 to do, work out DJANGO_SETTINGS env var, what if multiple projects son?
 
 """
-
 from pathlib import Path
-from local_settings import *
+# Build paths inside the project like this: BASE_DIR / 'subdir'.
+BASE_DIR = Path(__file__).resolve().parent.parent
+DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+from .local_settings import *
 DEBUG=True
-
-ALLOWED_HOSTS = ['10.1.10.119',
-                 'localhost',
-                 'dms.local' ]
-CSRF_TRUSTED_ORIGINS = [
-        "127.0.0.1"
-        '10.1.10.119',
-        'localhost',
-        'dms.local' 
-        ]
-
 TEMPLATE_DEBUG = DEBUG
 
 ADMINS = (
@@ -45,7 +37,7 @@ DATABASES = {
 # timezone as the operating system.
 # If running in a Windows environment this must be set to the same as your
 # system time zone.
-TIME_ZONE = 'America/Chicago'
+TIME_ZONE =  'America/Indiana/Indianapolis'
 
 # Language code for this installation. All choices can be found here:
 # http://www.i18nguy.com/unicode/language-identifiers.html
@@ -61,15 +53,12 @@ USE_I18N = True
 # calendars according to the current locale
 USE_L10N = True
 
-
-#
-# PROJECT_ROOT now set in local_settings.py
-#
+#PROJECT_ROOT = '/Users/scharlesworth/Bloominglabs/web_admin/'
 
 # Absolute filesystem path to the directory that will hold user-uploaded files.
 # Example: "/home/media/media.lawrence.com/media/"
 MEDIA_ROOT = os.path.join(PROJECT_ROOT, 'media')
-print("MEDIA_ROOT: %s" % MEDIA_ROOT)
+print ("MEDIA_ROOT: %s" % MEDIA_ROOT)
 # URL that handles the media served from MEDIA_ROOT. Make sure to use a
 # trailing slash.
 # Examples: "http://media.lawrence.com/media/", "http://example.com/media/"
@@ -96,7 +85,6 @@ STATICFILES_DIRS = (
 
 # List of finder classes that know how to find static files in
 # various locations.
-
 STATICFILES_FINDERS = (
     'django.contrib.staticfiles.finders.FileSystemFinder',
     'django.contrib.staticfiles.finders.AppDirectoriesFinder',
@@ -107,63 +95,43 @@ STATICFILES_FINDERS = (
 SECRET_KEY = 'byxynfcwf1kvym@(*rj*k*1ji8)5n&ge-_3cqt58o*=y$#-ne1'
 
 # List of callables that know how to import templates from various sources.
-"""
 TEMPLATE_LOADERS = (
     'django.template.loaders.filesystem.Loader',
     'django.template.loaders.app_directories.Loader',
 #     'django.template.loaders.eggs.Loader',
 )
-"""
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
-    'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
+    'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
-    ]
+]
 
-ROOT_URLCONF = 'urls'
+ROOT_URLCONF = 'django_app.urls'
 
 TEMPLATE_DIRS = (
     # Put strings here, like "/home/html/django_templates" or "C:/www/django/templates".
     # Always use forward slashes, even on Windows.
     # Don't forget to use absolute paths, not relative paths.
     os.path.join(PROJECT_ROOT,'templates'),
-    os.path.join(PROJECT_ROOT,'doorman/templates'),
 )
 
 INSTALLED_APPS = (
-        
-    'doorman',
+    'doorman.apps.DoormanConfig',    
+    'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
     'django.contrib.sessions',
  # prob moving code back and forth
-    'django.contrib.sites',
+#   'django.contrib.sites',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-    'django.contrib.admin',
+    'thermo',
 )
-
-TEMPLATES = [
-    {
-        'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [],
-        'APP_DIRS': True,
-        'OPTIONS': {
-            'context_processors': [
-                'django.template.context_processors.debug',
-                'django.template.context_processors.request',
-                'django.contrib.auth.context_processors.auth',
-                'django.contrib.messages.context_processors.messages',
-            ],
-        },
-    },
-]
-
 
 # A sample logging configuration. The only tangible logging
 # performed by this configuration is to send an email to
@@ -187,3 +155,20 @@ LOGGING = {
         },
     }
 }
+TEMPLATES = [
+    {
+        'BACKEND': 'django.template.backends.django.DjangoTemplates',
+        'DIRS': [],
+        'APP_DIRS': True,
+        'OPTIONS': {
+            'context_processors': [
+                'django.template.context_processors.debug',
+                'django.template.context_processors.request',
+                'django.contrib.auth.context_processors.auth',
+                'django.contrib.messages.context_processors.messages',
+            ],
+        },
+    },
+]
+
+
