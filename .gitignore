@@ -1,6 +1,7 @@
 *sensitive*
 web_admin/local_config.py
 web_admin/local_settings.py
+web_admin/django_app/local_settings.py
 web_admin/settings.py
 web_admin/BloomingLabs.db
 web_admin/rfid.log
@@ -43,5 +44,6 @@ web_admin/static/*
 backups/*
 backups
 *local_config.py
+*local_settings*
 gitdiff
 superDiff11-27-2013.txt
