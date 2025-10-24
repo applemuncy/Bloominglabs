@@ -86,6 +86,8 @@ Unwinding some functions to be simpler.
 Get all your programming done before senility sets in.
 Add const to PASSWORD line to shut the compiler up.
 09/07/2025 version 1.35 Apple
+10/23/2025 version 1.40 Apple
+10/24/2025 version 1.41 Apple
 */
 //#include <Wire.h>         // Needed for I2C Connection to the DS1307 date/time chip
 #include <EEPROM.h>       // Needed for saving to non-voilatile memory on the Arduino.
@@ -451,7 +453,7 @@ void readCommand() {
 	will check the password and kick off priv mode if good.
 	gives the 'too bad' msg if not.
 	*/
-	if (Serial.available()) {
+  while (Serial.available()) {
         
 		// Check if user entered a command this round
 		ch = Serial.read();
@@ -464,8 +466,10 @@ void readCommand() {
 		else{
 			(inString[inCount++] = ch);
 		}
+   
 		//Serial.print(ch);
 		// Turns echo on or off
+   
 		if(inCount==0) {
 			// done readin
 			cmd = inString[0];
@@ -614,8 +618,8 @@ void readCommand() {
 				}
 				case 'm': {
 					// add or update
-                    Serial.print("cmd string 2 ");
-                    Serial.println( atoi(cmdString[2]), HEX);
+          Serial.print("cmd string 2 ");
+          Serial.println( atoi(cmdString[2]), HEX);
 					if(privmodeEnabled==true || requestValidated == true) {
 						UserDB.upsertUser(atoi(cmdString[2]), strtoul(cmdString[1],NULL,16));
 					}
@@ -624,10 +628,17 @@ void readCommand() {
 					}
 					break;
 				}
+       
+        case 'y': {
+          //Serial.println("y seams to work");
+          break;
+        }
+        
 				case 'z': {
 					// 'zap' it
 					if(privmodeEnabled==true || requestValidated == true) {
-						UserDB.clearUsers();
+						//UserDB.clearUsers();  
+            Serial.println("Sorry, z is disable");
 					}
 					else {
 						logprivFail();
@@ -645,7 +656,7 @@ void readCommand() {
 				}
 				case '?': {
 					// Display help menu
-           Serial.println(F("Version 1.35   09/07/2025"));
+           Serial.println(F("Version 1.41 10/24/2025"));
            Serial.println(F("Valid commands are:"));
 					 Serial.println(F("(s)show user <tagNumber>"));
 					 Serial.println(F("(m)odify user <tagnumber> <usermask>"));
