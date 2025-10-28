@@ -91,62 +91,108 @@ prfo = UserProfile.objects.get(rfid_tag__iexact = 'shit')
 """
 
 import re, sys, os
-sys.path.append('/home/apple/git/Bloominglabs/web_admin')
+sys.path.append('/home/pi/Bloominglabs/web_admin')
 import logging
 import subprocess, select
 import irc.client
+import irc.bot
+import itertools
 import random
-import time, urllib, simplejson
+import time, urllib
+#, simplejson
 import time
+from time import sleep
 import datetime
 # for future investigation - weirdly from datetime import datetime didn't work!
 # for network piece
 import socket
-import sys
+
 
 
 upload_interval = 60 # seconds between uploading sensor/door reading
 last_upload_time = datetime.datetime.now()
-os.environ['DJANGO_SETTINGS_MODULE'] ="settings"
+os.environ['DJANGO_SETTINGS_MODULE'] ="django_app.settings"
 from django.conf import settings
+import django
+django.setup()
 
+import threading
+from queue import Queue
+#global queues for irc bot and rfid reader
+irc_q = Queue()
+rfid_q = Queue()
+
+# global flags for threads
+rfid_stop_flag = False
+irc_stop_flag = False
+
+
+from  django_app.settings import setup_logging
+
+setup_logging()
+logger = logging.getLogger(__name__)
+
+
+logger.info("after django setup")
 
 # port where the RFID server is running. put this in settings.py for the django
 # server
 RFID_PORT = settings.RFID_PORT
 RFID_HOST = settings.RFID_HOST
 
+IRC_PORT = settings.IRC_PORT
+IRC_CHANNEL = settings.IRC_CHANNEL
+IRC_NICKNAME = settings.IRC_NICKNAME    
+IRC_SERVER = settings.IRC_SERVER
+
+logger.info(f"port: {IRC_PORT}")
+logger.info(f"IRC_CHANNEL: {IRC_CHANNEL}")
+logger.info(f"nick: {IRC_NICKNAME}")
+logger.info(f"server:: {IRC_SERVER}")
+      
+ircConn = None
+
+guid = None
+uid_denied = None
+BotDied = False
+
+
+
+from asgiref.sync import sync_to_async
+
+os.environ['DJANGO_SETTINGS_MODULE'] ="settings"
+from django.conf import settings
+
 from django.db import models
-from DoorMan.models import UserProfile, AccessEvent 
+from doorman.models import UserProfile, AccessEvent 
 from django.contrib.auth.models import User
 """
-logging = logging.getLogger('rfid_logging')
-logging.setLevel(logging.INFO)
+logger = logging.getLogger('rfid_logger')
+logging.basicConfig(filename='/home/pi/log/DMS.log', encoding='utf-8', level=logging.INFO)
+
+logger.setLevel(logging.INFO)
 fh = logging.FileHandler('rfid.log')
-fh.setLevel(logging.INFO)
+fh.setLevel(logging.DEBUG)
 formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-logging.addHandler(fh)
+logger.addHandler(fh)
 ch = logging.StreamHandler()
 ch.setLevel(logging.WARNING)
 fh.setFormatter(formatter)
 ch.setFormatter(formatter)    
+
+
+logger.addHandler(ch)
+
 """
 
-logging.basicConfig(filename='DMS.log', encoding='utf-8', level=logging.INFO)
-logging.debug('This message should go to the log file')
-logging.info('So should this')
-logging.warning('And this, too')
-logging.error('And non-ASCII stuff, too, like Øresund and Malmö')
-
-port = settings.IRC_PORT
-channel = settings.IRC_CHANNEL
-IRC_CHANNEL = settings.IRC_CHANNEL
-nickname = settings.IRC_NICKNAME    
-IRC_SERVER = settings.IRC_SERVER
+logger.debug('This message should go to the log file')
+logger.info('So should this')
+logger.warning('And this, too')
+logger.error('And non-ASCII stuff, too, like Øresund and Malmö')
 
 #logging.addHandler(ch)
 
-logging.info("RFID logging bot started.")
+logger.info("RFID logger bot started.")
 
 random.seed()
 max_sleep = 3 # 'take a breath' after responding. prevent bots from making
@@ -176,18 +222,19 @@ random_greets = [
 ]
 
 # note. now have to do by tag. watch out for case sensitivity
-authpat =  re.compile("User (\S+) granted access", re.M)
+authpat =  re.compile(r"User (\S+) granted access", re.M)
 
-lockedoutpat = re.compile("User (\S+) locked out.", re.M)
+lockedoutpat = re.compile(r"User (\S+) locked out.", re.M)
 
-deniedpat = re.compile("(\S+) denied access at reader", re.M)
+deniedpat = re.compile(r"(\S+) denied access at reader", re.M)
 
 # last command
-last_command_pat = re.compile('\!last\s+(\d+|\s*)\s*(\S+)', re.M and re.IGNORECASE)
+last_command_pat = re.compile(r"\!last\s+(\d+|\s*)\s*(\S+)", re.M and re.IGNORECASE)
 
 # just look for access message, if so gimme the user
 def check_for_door(stuff):
     match = authpat.search(stuff)
+    logger.info(f"stuff match: {match}")
     if match:
         return match.group(1)
     else:
@@ -235,6 +282,7 @@ def create_dummy(rfid):
 
 def check_for_last_command(stuff):
     match = last_command_pat.search(stuff)
+    logger.info(f'match-last: {match}')
     if match:
         return match.groups()
     else:
@@ -252,66 +300,69 @@ def last_command_responses(stuff):
             num = 10 # don't flood the channel, son
     except:
         pass
-    if matches[1] == 'sensor':
-        qs = SensorEvent.objects.order_by('-event_date')[:num]
-        for q in qs:
-            responses.append('%s with value %s from sensor %s at %s' % (q.event_type, q.event_value, q.event_source, q.event_date))
-    elif matches[1] == 'access':
+    if matches[1] == 'access':
         qs = AccessEvent.objects.order_by('-event_date')[:num]
         for q in qs:
             responses.append('%s at %s' % (q.user.username, q.event_date))
     else:
-        responses = ('Command not understood. Types are ''sensor'' or ''access'', you asked for %s' % matches[1],)
-    print(responses)
+        responses = ('Command not understood. Types are  ''access'', you asked for %s' % matches[1],)
+
+    logger.info(F'responces: {responses}')
+
     return responses
 
 # like before but now both use these
 
 def handle_msg(connection, event ):
-    logging.info("handle_msg")
+    target = IRC_CHANNEL
+    logger.info(f"connection: {connection}")
 
-    logging.info("event.type")
-    logging.info(event.type)
+    logger.info("handle_msg")
 
-    logging.info("event.source")
-    logging.info(event.source)
+    logger.info("event.type")
+    logger.info(event.type)
 
-    logging.info("event.target")
-    logging.info(event.target)
+    logger.info("event.source")
+    logger.info(event.source)
 
-    logging.info("event.arguments[0]")
-    logging.info(event.arguments[0])
+    logger.info("event.target")
+    logger.info(event.target)
+
+    logger.info("event.arguments[0]")
+    logger.info(event.arguments[0])
 
     IRC_message = event.arguments[0]
 
-"""    
-    stuff = ','.join(event.arguments())
-    said = event.arguments()[0]
+    stuff = ','.join(event.arguments)
+    logger.info(f"stuff recieved: {stuff}")
 
-    (name,truename) = event.source().split('!')
-
+    said = event.arguments[0]
+    logger.info(f"said: {said}")
+    (name,truename) = event.source.split('!')
+    logger.info(f"name: {name} truename: {truename}")
     time.sleep(random.choice(range(max_sleep)))
     try:
-        if stuff.upper().find(IRC_NICK.upper()) >= 0:
+        if stuff.upper().find(IRC_NICKNAME.upper()) >= 0:
         #if stuff.er().find('fantasticmagic') >= 0:
-            if stuff.find('get lost')>=0:
-                 :w
-                 client.disconnect('AAGUUGGGHHHHHHuuaaaaa!')
-                logging.info("Fuck it, I disconnected")
+            if stuff.find('get lost')>=0: 
+                connection.disconnect('AAGUUGGGHHHHHHuuaaaaa!')
+                logger.info("Fuck it, I disconnected")
             else:
-#                client.privmsg(target,u'%s, %s' % ('Type ''last n access'' or ''last n sensor'' to see recent accesses or sensors',name))
+                connection.privmsg(target,u'%s, %s' % ('Type ''last n access''  to see recent accesses ',name))
                 msg = random_greets[random.choice(range(len(random_greets)))] % name
-                client.privmsg(target,msg)
+                connection.privmsg(target,msg)
 # handle last command (if anything came back)
         else:
             for r in last_command_responses(stuff):
-                client.privmsg(target,u'%s' % r)
+                connection.privmsg(target,u'%s' % r)
 
     except Exception as val:
-        logging.error("fail in pubmsg handle: (%s) (%s)" % (Exception, val))
-"""
+        logger.error("fail in pubmsg handle: (%s) (%s)" % (Exception, val))
+
 def handle_privmsg(connection, event):
-    handle_msg(connection ,event, (event.source().split('!'))[0])
+    logger.info("handle privmsg")
+    handle_msg(connection, event)
+#    handle_msg(connection, event, (event.source().split('!'))[0])
 
 
 """
@@ -319,6 +370,7 @@ kind of a big deal. handler of all msgs!
 """
 
 def handle_pubmsg(connection, event  ):
+    logger.info("handle pubmsg")
     handle_msg(connection, event )
 
 def handle_join(client,event):
@@ -326,101 +378,264 @@ def handle_join(client,event):
         client.privmsg(IRC_CHANNEL,'%s!!!' % name.upper())
 
 def log_door_event(connection, user_id):
+    logger.info(f"log_door_event user_id: {user_id}")
     prof = None
+    prof_QS = None
     try:
+
         prof = UserProfile.objects.get(rfid_tag__iexact = user_id)
+        logger.info(f"prof type")
+        logger.info(type(prof))
+        logger.info(F"prof: {prof}")
+        logger.info(F"prof obj: {prof.user.username}")
+
     except:
-        logging.error("Strange: no username found in DB for user %s." % user_id)
+        logger.error(f"Strange: no username found in DB for user {user_id}." )
     username = 'UNKNOWN'
     if prof:
         # note can't log unknow this way, though
+        logger.info(F"User name {prof.user.username}")
         event = AccessEvent(user = prof.user)
         event.save()
         username = prof.user.username
-    logging.info("we see: %s aka %s" % (user_id, username))
-    msg = "!s " + random_sez[random.choice(range(len(random_sez)))] % username
+    logger.info("we see: %s aka %s" % (user_id, username))
+    msg = "!s " + random_sez[random.choice(range(len(random_sez)))] %    username
     connection.privmsg(IRC_CHANNEL,msg)
 
 
+#new IRC code
 
+class MyBot(irc.bot.SingleServerIRCBot):
+
+    def __init__(self, channel, nickname, server, port=6667):
+    # A SingleServerIRCBot simplifies connection and management.
+        irc.bot.SingleServerIRCBot.__init__(self, [(server, port)], nickname, nickname)
+        self.channel = channel
+
+    def on_welcome(self, connection, event):
+        connection.join(self.channel)
+        logger.info(F"Connected to {self.channel}")
+        global ircConn
+        ircConn = connection
+        return
+# Called when a private message (privmsg) is received
+    def on_privmsg(self, connection, event):
+        self.do_command(connection, event)
+
+    # Called when a channel message (pubmsg) is received
+    def on_pubmsg(self, connection, event):
+        self.do_command(connection, event)
+
+    # The core logic for handling incoming messages
+    def do_command(self, connection, event):
+        source_nick = event.source.nick
+        message_text = event.arguments[0]
+        logger.info(f"[{self.channel}] <{source_nick}> {message_text}")
+        
+        # Echo the message back to the channel
+        if event.target == self.channel:
+            connection.privmsg(self.channel, f"Echo {self.channel}: {message_text}")
+            handle_pubmsg(connection, event)
+
+        else:
+            # For private messages to the bot
+            connection.privmsg(source_nick, f"Echo to  private by  bot: {message_text}")
+    def on_die():
+        global BotDied
+        BotDied = True
+
+
+
+
+def run_irc_bot():
+    logger.info('run_bot started')
+    bot = MyBot(IRC_CHANNEL, IRC_NICKNAME, IRC_SERVER, IRC_PORT)
+    bot.start()
+
+def read_rfid():
+    run = True
+    logger.info("read_rfid started")
+
+    my_client =  socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+
+    my_client.connect((
+        RFID_HOST,
+        RFID_PORT,
+        ))
+    logger.info(f'RFID_HOST:RFID_PORT {RFID_HOST}:{RFID_PORT}')
+    
+    logger.info("No loop anymore")
+    
+#    while run:   
+    while (run):
+        data =  my_client.recv(1024)
+        rfid_q.put(data.decode())
+        logger.info(f"fresh data: {data}")
+
+    
+
+
+    logger.info("closing my_client")
+    my_client.close()
+         
+def run_read_rfid():
+    logger.info("inside run_read_rfid") 
+    while True:
+        read_rfid()
+
+   
+
+def on_connect(connection, event):
+    connection.join(IRC_CHANNEL)
+    logger.info("joined channel: {IRC_CHANNEL}")
+    return
+
+def handle_rfid_data_str(data):
+    logger.info(f"stringy is: {data}")
+
+
+    uid = check_for_denied(data)
+  
+    if uid:
+        logger.info(F"uid denied: {uid}")
+        create_dummy(uid)
+        uid_denied = uid
+                   
+        
+    uid = check_for_lockedout(data)
+    if uid:
+        logger.info(F"lockedout uid: {uid}")
+        create_dummy(uid)
+
+    uid = check_for_door(data)
+    if uid:
+        logger.info(F"open door evernt: {uid}")
+        doorval = 1
+        log_door_event(ircConn, uid)
+
+    time.sleep(1)
+    
 
 if __name__ == '__main__':
-    logging.info("Started main:  logging.")
-    logging.info("Started IRC .")
+    logger.info("Started main:  logger.")
+    
 
-#    MDSbot = IrcBot(channel, nickname, server, port)
-#    MDSbot.start()
-    client = irc.client.IRC()
-    server = client.server()
-    server.connect(IRC_SERVER, port, nickname)
-    server.join( channel, key="")
 
-    server.privmsg(channel, "I'm glad to be here.")
-    #client.add_global_handler("pubmsg" , handle_pubmsg(client , "pubmsg")) 
-    client.add_global_handler("pubmsg" , handle_pubmsg)
 
-        # connect up in this piece
-    weConnected = False
-    logging.info("Started RFID client.")
+    irc_thread = threading.Thread(target = run_irc_bot)
+    rfid_thread = threading.Thread(target = run_read_rfid)
+
+    logger.info("Starting irc_thread")
+    irc_thread.start()
+
+    sleep(1)
+
+    logger.info("Starting rfid .")
+    rfid_thread.start();
+#    run_read_rfid()
+    
+    
+
+
+    logger.info("while forever")
+    while True:
+        if (not rfid_q.empty()):
+            data = rfid_q.get()
+            logger.info(f"data from rfid_q: {data}") 
+            handle_rfid_data_str(data )
+
+
+        if (guid != None):
+            log_door_event(ircConn , guid)
+            guid = None
+        if(uid_denied != None):
+            logger.info(F"Creating dummy: {uid_denied})")
+            
+            create_dummy(uid_denied)
+            uid_denied = None
+
+        time.sleep(1)
+
+        if BotDied == True:
+            logger.info("BotDied restarting")
+            BotDied = False
+            irc_stop_flag = True
+            irc_thread.join()
+            irc_stop_flag = False
+            irc_thread = threading.Thread(target = run_irc_bot)
+            irc_thread.start
+
+
+    
+    """
+    logger.info("irc setup finished")
+
+    logger.info("Starting RFID client.")
 
     rfid_client = socket.socket(socket.AF_INET,socket.SOCK_STREAM)
+    weConnected = False
     while not weConnected:
         try:
             rfid_client.connect((RFID_HOST,RFID_PORT))
             weConnected = True
-            logging.info("Connected RFID socket.")
+            logger.info("Connected RFID socket.")
 
         except:
-            logging.info("retrying connect to rfid in 10....")
+            logger.info("retrying connect to rfid in 10....")
             time.sleep(10)
-            logging.info("Not Connected")
+            logger.info("Not Connected")
+
+            
+            
     stringy = ''
     doorval = 0
     officeval = 0
     workshopval = 0
+
+    logger.info("before while True")    
+
     while True:
         doorval = 0
         officeval = 0
-# Wait for input from stdin & socket 1 is timeout
-        input_ready, output_ready,except_ready = select.select([rfid_client], [],[],1)
+        # Wait for input from stdin & socket 1 is timeout
+        logger.info("before input_ready read")
+        input_ready, output_ready, except_ready = select.select([rfid_client], [],[],1)
+        logger.info("after select.select")
+        logger.info(f"input_ready: {input_ready} ")
+        
         while input_ready:
+            logger.info("while input_ready")
         # you could have multiple
             for i in input_ready:
                 if i == rfid_client:
-                    charry = rfid_client.recv(1).decode("utf-8")
+                    charry = rfid_client.recv(1024).decode("utf-8")
                     stringy = stringy + charry
-                    logging.info("stringy = ")
-                    logging.info(stringy)
-                    uid = check_for_denied(stringy)
+                    logger.info("stringy = ")
+                    logger.info(stringy)
+                    uid = check_for_denied(stringy)   # get tag number
+                                                     # should mean unknown tag
                     if uid:
                         create_dummy(uid)
-                    uid = check_for_lockedout(stringy)
+
+                    uid = check_for_lockedout(stringy)   
+
                     if uid:
                         create_dummy(uid)
+                        
                     uid = check_for_door(stringy)
+
                     if uid:
                         doorval = 1
-                        log_door_event(server, uid)
+                        log_door_event(ircConn, uid)
                         time.sleep(3)
                         stringy = ''
-            input_ready, output_ready,except_ready = select.select([rfid_client], [],[],1)
-            logging.info( "input_ready = %s" % input_ready)
-            logging.info( "output_ready = %s" %  output_ready)
-            logging.info( "except_ready = %s" %  except_ready)
+            logger.info('end of wile imput_ready')            
+        input_ready, output_ready, except_ready = select.select([rfid_client], [],[],1)
+            logger.info( "input_ready = %s" % input_ready)
+            logger.info( "output_ready = %s" %  output_ready)
+            logger.info( "except_ready = %s" %  except_ready)
 
+        logger.info('end of while True')   
+"""        
 
-        try:
-            if (datetime.datetime.now() - last_upload_time).total_seconds() > upload_interval:
-                last_upload_time = datetime.datetime.now()
-                logging.info("let's do some pachube shit")
-                doorval = 0
-                officeval = 0
-                workshopval = 0
-
-        except Exception as val:
-            print("cosm probs: %s, %s" % (Exception, val))
-            logging.error("IRC/pachube update problems: %s:%s" % (Exception, val))
-            
-        client.process_once(2)
-        time.sleep(5)
-
+        

@@ -4,7 +4,7 @@ from django.contrib import admin
 from django.contrib.auth.models import User
 from django.contrib.auth.admin import UserAdmin
 from models import UserProfile
-# sdc 6/24/2015
+ sdc 6/24/2015
 
 admin.site.unregister(User)
 
@@ -50,9 +50,9 @@ class RFIDFilter(SimpleListFilter):
         filter be access
         """
         if self.value() == 'Yes':
-            return queryset.filter(userprofile__rfid_access__exact = True)
+            return queryset.filter(profile__rfid_access__exact = True)
         if self.value() == 'No':
-            return queryset.filter(userprofile__rfid_access__exact = False)
+            return queryset.filter(profile__rfid_access__exact = False)
 
 # also could try (no 'fk_name') http://stackoverflow.com/questions/4565814/django-user-userprofile-and-admin
 
@@ -74,30 +74,24 @@ class CustomUserAdmin(UserAdmin):
                     'user_rfid_label',
                     'user_sync_date', 
                     'is_active')
-    list_filter = (RFIDFilter,)
+    list_filter = (
+        RFIDFilter,
+    )
 
     def user_rfid_tag(self, instance):
         user = instance.profile
-
-
         return user.rfid_tag
 
     def user_rfid_label(self, instance):
         user = instance.profile
-
-
         return user.rfid_label
 
     def user_rfid_access(self, instance):
         user = instance.profile
-
-
         return user.rfid_access
 
     def user_sync_date(self, instance):
         user = instance.profile
-
-       
         return user.sync_date
 
 

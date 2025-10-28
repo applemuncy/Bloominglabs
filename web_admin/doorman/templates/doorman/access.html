@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+
+{% block title %} All Door Events For User {% endblock %}
+{% block content %}
+{% if all_access_list %}
+    <ul>
+    {% for event in all_access_list %}
+    <li><a href="/doorman/{{ event.id }}/">{{event.user}} used the door at {{ event.event_date }}</a></li>
+    {% endfor %}
+    </ul>
+{% else %}
+    <p>No door events are available.</p>
+{% endif %}
+
+{% if is_paginated %}
+   <div class="pagination">
+      <span class="page-links">
+	{% if page_obj.has_previous %}
+		<a href="?page={{ page_obj.previous_page_number }}">previous</a>
+	{% endif %}
+
+	{% if page_obj.has_next %}
+		<a href="?page={{ page_obj.next_page_number }}">next</a>
+	{% endif %}
+      </span>
+   </div>
+{% endif %}
+{% endblock %}

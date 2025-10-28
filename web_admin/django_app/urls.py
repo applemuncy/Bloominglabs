@@ -1,10 +1,8 @@
 #from django.conf.urls.defaults import patterns, include, url
-#from thermo.views import thermo_set
 #from django.contrib.auth.views import login
 #from .views import open_door
 
 from .settings import *
-#from thermo.views import *
 # Uncomment the next two lines to enable the admin:
 from django.contrib import admin
 from django.urls  import include, path
@@ -21,7 +19,6 @@ urlpatterns = [
     # Uncomment the next line to enable the admin:
     path('', include('doorman.urls')),	
     path('admin/', admin.site.urls),
- #   path('thermo/', thermo_set),
  #   path('open_door/', open_door),
  #   path('accounts/login/', login),
     ]

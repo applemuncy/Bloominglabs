@@ -3,9 +3,38 @@
 to do, work out DJANGO_SETTINGS env var, what if multiple projects son?
 
 """
+import os
+import sys
+import logging
+
+logger = logging.getLogger(__name__)
+def setup_logging():
+    logging.basicConfig(
+        level=logging.DEBUG,
+        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+        handlers=[
+            logging.FileHandler('/home/pi/log/app.log'),
+            logging.StreamHandler(sys.stdout)
+        ]
+    )
+
+
+setup_logging()
+logger = logging.getLogger(__name__)
+
+
 from pathlib import Path
+
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
+logger.info(f"BASE_DIR:   {BASE_DIR}")
+
+# The absolute path where user-uploaded files will be stored
+MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
+
+# The URL that serves the media files
+MEDIA_URL = '/media/'
+
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 from .local_settings import *
@@ -13,9 +42,8 @@ DEBUG=True
 TEMPLATE_DEBUG = DEBUG
 
 ADMINS = (
-    ('steve','steve@bloominglabs.org'),
+    ('apple','apple@localhost'),
 )
-import os
 MANAGERS = ADMINS
 AUTH_PROFILE_MODULE = 'doorman.UserProfile'
 
@@ -55,17 +83,12 @@ USE_L10N = True
 
 #PROJECT_ROOT = '/Users/scharlesworth/Bloominglabs/web_admin/'
 
-# Absolute filesystem path to the directory that will hold user-uploaded files.
-# Example: "/home/media/media.lawrence.com/media/"
-MEDIA_ROOT = os.path.join(PROJECT_ROOT, 'media')
-print ("MEDIA_ROOT: %s" % MEDIA_ROOT)
+logger.info("MEDIA_ROOT: %s" % MEDIA_ROOT)
 # URL that handles the media served from MEDIA_ROOT. Make sure to use a
 # trailing slash.
 # Examples: "http://media.lawrence.com/media/", "http://example.com/media/"
-MEDIA_URL = '/media/'
 
 # sort of goofy thing to preserve window stuff
-WWW_ROOT = os.path.join(PROJECT_ROOT, 'www')
 
 # Absolute path to the directory static files should be collected to.
 # Don't put anything in this directory yourself; store your static files
@@ -120,6 +143,25 @@ TEMPLATE_DIRS = (
     os.path.join(PROJECT_ROOT,'templates'),
 )
 
+logger.info(F"TEMPLATE_DIRS: {TEMPLATE_DIRS}")
+
+TEMPLATES = [
+    {
+        'BACKEND': 'django.template.backends.django.DjangoTemplates',
+        'DIRS': [os.path.join(BASE_DIR, 'templates')], # Add this line
+        'APP_DIRS': True,
+        'OPTIONS': {
+            'context_processors': [
+                'django.template.context_processors.debug',
+                'django.template.context_processors.request',
+                'django.contrib.auth.context_processors.auth',
+                'django.contrib.messages.context_processors.messages',
+            ],
+        },
+    },
+]
+
+
 INSTALLED_APPS = (
     'doorman.apps.DoormanConfig',    
     'django.contrib.admin',
@@ -130,7 +172,6 @@ INSTALLED_APPS = (
 #   'django.contrib.sites',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-    'thermo',
 )
 
 # A sample logging configuration. The only tangible logging
