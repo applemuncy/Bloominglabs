@@ -88,29 +88,24 @@ Add const to PASSWORD line to shut the compiler up.
 09/07/2025 version 1.35 Apple
 10/23/2025 version 1.40 Apple
 10/24/2025 version 1.41 Apple
+10/28/2025 version 1.44 Apple
 */
-//#include <Wire.h>         // Needed for I2C Connection to the DS1307 date/time chip
+
 #include <EEPROM.h>       // Needed for saving to non-voilatile memory on the Arduino.
-//#include <avr/pgmspace.h> // Allows data to be stored in FLASH instead of RAM
+#include <avr/pgmspace.h> // Allows data to be stored in FLASH instead of RAM
 
-
+// pull in PASSWORD
+#include "local_settings.h"
 
 #include "EEPROM_UserDB.h"
-//#include <DS1307.h>       // DS1307 RTC Clock/Date/Time chip library
+
 
 // forked from github  paulo-raca/YetAnotherArduinoWiegandLibrary
+// available in arduino library
 #include <Wiegand.h>    // Wiegand 26 reader format libary
 
 //#include <PCATTACH.h>     // Pcint.h implementation, allows for >2 software interupts.
-/* Static user List - Implemented as an array for testing and access override
-*/
-long sdc  = 0xFFFFFF;                  // Name and badge number in HEX. We are not using checksums or site ID, just the whole
-long dosman =  0xFFFFFF;                  // output string from the reader.
-long apple = 0xFFFFFF;
-const long  superUserList[] = {
-	dosman,sdc,apple
-}
-;
+
 
 bool DEBUG = true;
 #define PIN_D0 2
@@ -139,7 +134,6 @@ void PROGMEMprintln(const char str[]);
 void lockDoor();
 void unlockDoor();
 void logAccessGranted(long user, byte reader);
-bool checkSuperuser(long input);
 void logAccessDenied(long user, byte reader);
 void logReboot();
 
@@ -161,11 +155,11 @@ unsigned long doorlocktimer=0;
 unsigned long consolefailTimer=0;
 // Console password timer for failed logins
 byte consoleFail=0;
-int numUsers = (sizeof(superUserList)/sizeof(long)) ;                 //User access array size (used in later loops/etc)
+
 #define NUMDOORS (sizeof(doorPin)/sizeof(byte))
 //#define numAlarmPins (sizeof(analogsensorPins)/sizeof(byte))
 // going this way son
-const char* PASSWORD = "pass";
+
 //Other global variables
 byte second, minute, hour, dayOfWeek, dayOfMonth, month, year;
 // Global RTC clock variables. Can be set using DS1307.getDate function.
@@ -308,16 +302,9 @@ void loop()                                     // Main branch, runs over and ov
 
 		else
 		{
-			if(checkSuperuser(reader)) {
-				// Check if a superuser, grant access.
-				logAccessGranted(reader, 1);
-				// Log and unlock door 1
-				unlockDoor();
-				// Unlock the door.
-			}
-			else {
+			
 				logAccessDenied(reader,1);
-			}
+			
 		}
 
 	reader = 0;
@@ -339,28 +326,13 @@ void loop()                                     // Main branch, runs over and ov
  Access System Functions - Modify these as needed for your application.
 These function control lock/unlock and user lookup.
 */
-bool checkSuperuser(long input){
-	// Check to see if user is in the user list. If yes, return their index value.
-	bool found= false;
-	for(int i=0; i<numUsers; i++){
-		if(input == superUserList[i]){
-			Serial.print("Superuser ");
-			Serial.print(i,DEC);
-			Serial.println(" found.");
-			found= true;
-			return found;
-		}
-	}
-	return found;
-	//If no, return false
-}
 
 void unlockDoor() {
 	//Send an unlock signal to the door and flash the Door LED
 	int dp;
 	dp=DOORPIN;
 	
-	Serial.print("doorpin is  ");
+	Serial.print(F("doorpin is  "));
     Serial.println(dp, DEC);
 // I must have wired the relay backwords, Check in the future  
 	digitalWrite(dp, HIGH);
@@ -388,7 +360,7 @@ void logReboot() {
 }
 
 void logTagPresent (long user, byte reader) {
-	Serial.print(F("User "));
+	Serial.print("User ");
 	if(DEBUG){
 		Serial.print(user,HEX);
 	}
@@ -558,12 +530,12 @@ void readCommand() {
 				case 'a': {
 					// List whole user database
 					if(privmodeEnabled==true || requestValidated == true) {
-						Serial.println("");
-						Serial.print("UserNum:");
-						Serial.print("\t");
-						Serial.print("Usermask:");
-						Serial.print("\t");
-						Serial.println("TagNum:");
+						Serial.println(F(""));
+						Serial.print(F("UserNum:"));
+						Serial.print(F("\t"));
+						Serial.print(F("Usermask:"));
+						Serial.print(F("\t"));
+						Serial.println(F("TagNum:"));
 						UserDB.dumpUsers();
 					}
 					else{
@@ -601,10 +573,15 @@ void readCommand() {
 				case '9': {
 					// Show site status
 					Serial.print(F( "Door is "));
-
-					Serial.println(doorLocked ? "locked" : "unlocked");
-					break;
+          if(doorLocked){
+            Serial.println(F("locked"));
+          }
+          else {  
+					  Serial.println(F("unlocked"));
+          }
+				  break;
 				}
+       
 				case 'o': {
 					if(privmodeEnabled==true || requestValidated == true) {
 						unlockDoor();  // Open the door
@@ -618,7 +595,7 @@ void readCommand() {
 				}
 				case 'm': {
 					// add or update
-          Serial.print("cmd string 2 ");
+          Serial.print(F("cmd string 2 "));
           Serial.println( atoi(cmdString[2]), HEX);
 					if(privmodeEnabled==true || requestValidated == true) {
 						UserDB.upsertUser(atoi(cmdString[2]), strtoul(cmdString[1],NULL,16));
@@ -630,7 +607,7 @@ void readCommand() {
 				}
        
         case 'y': {
-          //Serial.println("y seams to work");
+          Serial.println(F("y seams to work"));
           break;
         }
         
@@ -638,7 +615,7 @@ void readCommand() {
 					// 'zap' it
 					if(privmodeEnabled==true || requestValidated == true) {
 						//UserDB.clearUsers();  
-            Serial.println("Sorry, z is disable");
+            Serial.println(F("Sorry, z is disable"));
 					}
 					else {
 						logprivFail();
@@ -656,7 +633,7 @@ void readCommand() {
 				}
 				case '?': {
 					// Display help menu
-           Serial.println(F("Version 1.41 10/24/2025"));
+           Serial.println(F("Version 1.44 10/28/2025"));
            Serial.println(F("Valid commands are:"));
 					 Serial.println(F("(s)show user <tagNumber>"));
 					 Serial.println(F("(m)odify user <tagnumber> <usermask>"));
@@ -692,7 +669,13 @@ void pinStateChanged() {
 // Instead of a message, the seconds parameter can be anything you want -- Whatever you specify on `wiegand.onStateChange()`
 void stateChanged(bool plugged, const char* message) {
     Serial.print(message);
-    Serial.println(plugged ? "CONNECTED" : "DISCONNECTED");
+    if (plugged) {
+      Serial.println(F("CONNECTED")); 
+    }
+      else
+    {
+      Serial.println(F("DISCONNECTED"));
+    }
 }
 
 // Notifies when a card was read.
@@ -700,10 +683,10 @@ void stateChanged(bool plugged, const char* message) {
 void receivedData(uint8_t* data, uint8_t bits, const char* message) {
     reader = 0;
     readerCount = bits;    
-//    Serial.println("From receivedData");
+//    Serial.println(F("From receivedData"));
 //    Serial.print(message);
 //    Serial.print(bits);
-//    Serial.print("bits / ");
+//    Serial.print(F("bits / "));
     //Print value in HEX
     
     uint8_t bytes = (bits+7)/8;
@@ -722,9 +705,9 @@ void receivedData(uint8_t* data, uint8_t bits, const char* message) {
 void receivedDataError(Wiegand::DataError error, uint8_t* rawData, uint8_t rawBits, const char* message) {
     Serial.print(message);
     Serial.print(Wiegand::DataErrorStr(error));
-    Serial.print(" - Raw data: ");
+    Serial.print(F(" - Raw data: "));
     Serial.print(rawBits);
-    Serial.print("bits / ");
+    Serial.print(F("bits / "));
 
     //Print value in HEX
     uint8_t bytes = (rawBits+7)/8;
