@@ -1,0 +1,14 @@
+[Unit]
+Description=DMS door bot
+After=multi-user.target
+
+[Service]
+User=pi
+WorkingDirecto0ry=/home/pi/Bloominglabs/bot
+
+Type=simple
+Restart=always
+ExecStart=/home/pi/Bloominglabs/bots/run.sh
+
+[Install]
+WantedBy=multi-user.target

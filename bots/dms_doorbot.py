@@ -195,7 +195,7 @@ logger.error('And non-ASCII stuff, too, like Øresund and Malmö')
 logger.info("RFID logger bot started.")
 
 random.seed()
-max_sleep = 3 # 'take a breath' after responding. prevent bots from making
+max_sleep = 1 # 'take a breath' after responding. prevent bots from making
 # you make a damn fool of yourself
 
 # %s - pass in name
@@ -415,6 +415,10 @@ class MyBot(irc.bot.SingleServerIRCBot):
     def on_welcome(self, connection, event):
         connection.join(self.channel)
         logger.info(F"Connected to {self.channel}")
+
+        #the set_keepalive should handle reconnections after network troubles.
+        connection.set_keepalive(600)
+
         global ircConn
         ircConn = connection
         return
