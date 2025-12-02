@@ -283,7 +283,7 @@ def create_dummy(rfid):
 def check_for_last_command(stuff):
     match = last_command_pat.search(stuff)
     logger.info(f'match-last: {match}')
-    if match:
+    if  match:
         return match.groups()
     else:
         return None
@@ -292,6 +292,7 @@ def last_command_responses(stuff):
     matches = check_for_last_command(stuff)
     num = 1
     responses = []
+
     if not matches:
         return responses
     try:
@@ -473,8 +474,15 @@ def read_rfid():
 #    while run:   
     while (run):
         data =  my_client.recv(1024)
-        rfid_q.put(data.decode())
-        logger.info(f"fresh data: {data}")
+        data = data.decode()
+        if data:
+
+            data_s = data.split()
+            if 'UNUSED' in data_s: 
+                continue 
+            else:
+                rfid_q.put(data)
+                logger.info(f"fresh data: {data}")
 
     
 
@@ -496,26 +504,28 @@ def on_connect(connection, event):
 
 def handle_rfid_data_str(data):
     logger.info(f"stringy is: {data}")
-
-
-    uid = check_for_denied(data)
-  
-    if uid:
-        logger.info(F"uid denied: {uid}")
-        create_dummy(uid)
-        uid_denied = uid
-                   
-        
-    uid = check_for_lockedout(data)
-    if uid:
-        logger.info(F"lockedout uid: {uid}")
-        create_dummy(uid)
+#start by looking for door open event
+    global uid
 
     uid = check_for_door(data)
     if uid:
         logger.info(F"open door evernt: {uid}")
         doorval = 1
         log_door_event(ircConn, uid)
+        return
+
+
+
+    uid = check_for_denied(data)
+    global uid_denied
+    if uid:
+        logger.info(F"uid denied: {uid}")
+        uid_denied = uid
+        return               
+        
+    uid = check_for_lockedout(data)
+    if uid:
+        logger.info(F"lockedout uid: {uid}")
 
     time.sleep(1)
     
@@ -571,75 +581,4 @@ if __name__ == '__main__':
 
 
     
-    """
-    logger.info("irc setup finished")
-
-    logger.info("Starting RFID client.")
-
-    rfid_client = socket.socket(socket.AF_INET,socket.SOCK_STREAM)
-    weConnected = False
-    while not weConnected:
-        try:
-            rfid_client.connect((RFID_HOST,RFID_PORT))
-            weConnected = True
-            logger.info("Connected RFID socket.")
-
-        except:
-            logger.info("retrying connect to rfid in 10....")
-            time.sleep(10)
-            logger.info("Not Connected")
-
-            
-            
-    stringy = ''
-    doorval = 0
-    officeval = 0
-    workshopval = 0
-
-    logger.info("before while True")    
-
-    while True:
-        doorval = 0
-        officeval = 0
-        # Wait for input from stdin & socket 1 is timeout
-        logger.info("before input_ready read")
-        input_ready, output_ready, except_ready = select.select([rfid_client], [],[],1)
-        logger.info("after select.select")
-        logger.info(f"input_ready: {input_ready} ")
-        
-        while input_ready:
-            logger.info("while input_ready")
-        # you could have multiple
-            for i in input_ready:
-                if i == rfid_client:
-                    charry = rfid_client.recv(1024).decode("utf-8")
-                    stringy = stringy + charry
-                    logger.info("stringy = ")
-                    logger.info(stringy)
-                    uid = check_for_denied(stringy)   # get tag number
-                                                     # should mean unknown tag
-                    if uid:
-                        create_dummy(uid)
-
-                    uid = check_for_lockedout(stringy)   
-
-                    if uid:
-                        create_dummy(uid)
-                        
-                    uid = check_for_door(stringy)
-
-                    if uid:
-                        doorval = 1
-                        log_door_event(ircConn, uid)
-                        time.sleep(3)
-                        stringy = ''
-            logger.info('end of wile imput_ready')            
-        input_ready, output_ready, except_ready = select.select([rfid_client], [],[],1)
-            logger.info( "input_ready = %s" % input_ready)
-            logger.info( "output_ready = %s" %  output_ready)
-            logger.info( "except_ready = %s" %  except_ready)
-
-        logger.info('end of while True')   
-"""        
-
-        
+       

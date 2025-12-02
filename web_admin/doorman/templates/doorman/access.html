@@ -16,11 +16,11 @@
    <div class="pagination">
       <span class="page-links">
 	{% if page_obj.has_previous %}
-		<a href="?page={{ page_obj.previous_page_number }}">previous</a>
+	<a href="?page={{ page_obj.previous_page_number }}"><b>Previous 20       </b></a>
 	{% endif %}
 
 	{% if page_obj.has_next %}
-		<a href="?page={{ page_obj.next_page_number }}">next</a>
+	<a href="?page={{ page_obj.next_page_number }}"><b>Next 20</b></a>
 	{% endif %}
       </span>
    </div>

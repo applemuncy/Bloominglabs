@@ -10,9 +10,6 @@ logger = logging.getLogger(__name__)
 
 HOST = 'fablabdoor.local'
 PORT = 6666
-newpat =  re.compile(r"Tag: (\S+) successfully added with mask:(\S+)", re.M)
-foundpat = re.compile(r"Tag: (\S+) found and updated to mask:(\S+)", re.M)
-
 # do:
 # returns True/False
 # tested and works with
@@ -22,7 +19,20 @@ foundpat = re.compile(r"Tag: (\S+) found and updated to mask:(\S+)", re.M)
 # other test cases(?????)
 
 
-def open_fucking_door(password, host = HOST, port = PORT):
+#
+# 
+#
+def make_connection(host = HOST, port = PORT):
+    """
+    Make a socket 
+    
+    Args:
+        Host
+        Port
+
+    Returns:
+        socket or false
+    """
     try:
       logger.info("make socket")
       sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -30,62 +40,150 @@ def open_fucking_door(password, host = HOST, port = PORT):
       logger.info(f"[CREATE SOCKET ERROR]  {e}")
       return False
     try:
-      print ("connect")
+      logger.info ("connect")
       sock.connect((host,int(port)))
     except socket.error as  msg:
       sys.stderr.write(f"[CONNECT ERROR]  { msg}")
       return False
-# add Exception below
+    finally:
+        return sock
+
+def open_fucking_door(password, host = HOST, port = PORT):
+    """
+        Send open command to Door
+
+        Args:
+            host
+            port
+
+        Returns: True or False    
+    """
+    logger.info("make socket")
+    sock = make_connection( host, port)
+    if (sock == False):
+        return False
     try:
-        print ("send")
-        print (password)
+        logger.info (F"send password: {password}")
         msg = F"o 1${password}\r\n"
-        print('msg is :')
-        print(msg)
+        logger.info(F'msg is : {msg}')
         sock.send(msg.encode('utf-8'))
     except socket.error as msg:
-        sys.stderr.write(f"[SEND ERROR] { msg}")
+        logger.info(f"[SEND ERROR] { msg}")
         return False
     # at this point essentially fuck it.
-    return True
+    finally:
+        sock.close()
+        return True
+
+newpat =  re.compile(r"Tag: (\S+) successfully added with mask:(\S+)", re.M)
+foundpat = re.compile(r"Tag: (\S+) found and updated to mask:(\S+)", re.M)
 
 def modify_user(host, port, tag, mask, password):
+    """
+    Add or Modify RFID tag # and mask in EEPROM
+
+    Args:
+        host
+        port
+        RFID tag #
+        mask
+        password
+
+    Returns True or False
+        
+    """
     
     logger.info("modify_user ")
     logger.info(f"host: {host} port: {port}")
-    client_rfid = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     data_str = F"m {tag} {mask}${password}\r\n"
     logger.info(f"send data_str: {data_str}")
  
-    try:
-        client_rfid.connect((host, port))
-        logger.info("client_rfid connected")
-        client_rfid.sendall(data_str.encode('utf-8'))
-        data_recv = client_rfid.recv(1024)
-        returned_data_str = data_recv.decode("utf-8")
-        logger.info(f"Receved from RFID {returned_data_str}")
- 
-    except ConnectionRefusedError:
-        logger.info(f"Connection refused. Ensure the server is running on {SERVER_HOST}:{SERVER_PORT}")
-    except Exception as e:
-        logger.info(f"An error occurred: {e}")
-    finally:
-        # Close the socket
-        client_rfid.close()
-        logger.info("Socket closed.")
- 
+    client_rfid = make_connection(host, port)
+    if (client_rfid == False):
+        return False
+
+    logger.info("client_rfid connected")
+    client_rfid.sendall(data_str.encode('utf-8'))
+    data_recv = client_rfid.recv(1024)
+    returned_data_str = data_recv.decode("utf-8")
+    logger.info(f"Receved from RFID {returned_data_str}")
+    client_rfid.close()
+    logger.info("Socket closed.")
+
+    logger.info(F"returned_data_str: {returned_data_str}")
+  
     success = False
+
     match = newpat.search(returned_data_str)
     if match:
         logger.info("tag: %s mask %s\n" % (match.group(1), match.group(2)))
         success = True
- 
-    logger.info(F"returned_data_str: {returned_data_str}")
+        return success
+    
+    match =foundpat.search(returned_data_str)
+    if match:
+        logger.info("tag: %s mask %s\n" % (match.group(1), match.group(2)))
+        success = True
+        return success
+
     logger.info(success)
     return success
 
 
 """
+Remove tag from EEPROM
+"""
+
+
+removed_pat =  re.compile(r"User deleted for tag: (\S+)", re.M)
+not_found_pat = re.compile(r"Tag: (\S+) found and updated to mask:(\S+)", re.M)
+
+def remove_rfid_from_EEPROM(host, port, tag,  password):
+    """
+    Remove RFID tag # from EEPROM
+
+    Args:
+        host
+        port
+        RFID tag #
+        password
+    Returns True or False
+    """
+    logger.info(f"remove rfid from EEPROM: {tag}  ")
+    logger.info(f"host: {host} port: {port}")
+    data_str = F"r {tag} {password}\r\n"
+    logger.info(f"send data_str: {data_str}")
+    sock = make_connection(host, port)
+    if ( sock == False):
+        return False
+    
+    logger.info("client_rfid connected")
+    sock.sendall(data_str.encode('utf-8'))
+    data_recv = sock.recv(1024)
+    returned_data_str = data_recv.decode("utf-8")
+    logger.info(f"Receved from RFID {returned_data_str}")
+    sock.close()
+    logger.info("Socket closed.")
+
+    logger.info(F"returned_data_str: {returned_data_str}")
+  
+    success = False
+
+    match = removed_pat.search(returned_data_str)
+    if match:
+        logger.info("tag: %s removed from EEPROM\n" % (match.group(1)))
+        success = True
+        return success
+    
+    match =not_found_pat.search(returned_data_str)
+    if match:
+        logger.info("tag: %s not found in EEPROM\n" % (match.group(1)))
+        success = False
+    
+
+    logger.info(success)
+    return success #False
+
 """
 # wow, that's easy
 # modify to look for a response(?)
@@ -119,7 +217,7 @@ def send_command(command):
     sock.close()     
     print (string)
     return string
-
+"""
 if __name__ == '__main__':
     #send_command("m 222222 1$notpassword\r\n")
     modify_user(HOST, PORT, "222222", "1", "notpassword")
