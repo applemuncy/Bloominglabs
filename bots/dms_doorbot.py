@@ -520,6 +520,7 @@ def handle_rfid_data_str(data):
     global uid_denied
     if uid:
         logger.info(F"uid denied: {uid}")
+        create_dummy(uid)
         uid_denied = uid
         return               
         
@@ -564,8 +565,8 @@ if __name__ == '__main__':
             guid = None
         if(uid_denied != None):
             logger.info(F"Creating dummy: {uid_denied})")
-            
-            create_dummy(uid_denied)
+            logger.info("*** not creating dummy here***")
+            #create_dummy(uid_denied)
             uid_denied = None
 
         time.sleep(1)
